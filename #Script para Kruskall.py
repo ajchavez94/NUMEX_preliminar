@@ -1,5 +1,5 @@
 #Script para Kruskall
-
+#hola
 df = data
 especie = "Hedyosmun purpurascens"
 variable = v
