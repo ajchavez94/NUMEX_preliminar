@@ -11,7 +11,7 @@ def calculate_iWUE(iWUE):
  # clean values of C that are incorrect. Too low, less than 35%
  #iWUE = iWUE[iWUE['[C] m/m (%)'] >= 0.35]
  
- print("Delete [C] m/m (%) values lower than 35%")
+ print("No Delete [C] m/m (%) values lower than 35%")
  #iWUE = iWUE.loc[iWUE['[C] m/m (%)'] >= 35]
 
  iWUE["t13C_cell"] = (delt13Cair- iWUE["δ13C (‰ v.s.V-PDB)"])/(1+(iWUE["δ13C (‰ v.s.V-PDB)"]/1000)) #HELP
@@ -25,7 +25,7 @@ def calculate_iWUE(iWUE):
  #iWUE["iWUE (μmol/mol)_m2"] = (iWUE["Cair"]/1.6)*(1-(iWUE["Ci_2"]/iWUE["Cair"]))
  value = len(iWUE)
 
- print("Cleaning negative values of iWUE (μmol/mol)")
+ print("No Cleaning negative values of iWUE (μmol/mol)")
  #iWUE = iWUE[iWUE['iWUE (μmol/mol)'] >= 1]
 
  print("The length of the df is " + str(value))

@@ -1,7 +1,16 @@
 #Script para Kruskall
 #hola
+def(df,especie_number)
 df = data
-especie = "Hedyosmun purpurascens"
+1 =
+2 ="Hedyosmun purpurascens"
+3 =
+4 =
+5 =
+6 =
+7 =
+8 =
+especie = especie_number
 variable = v
 sub_df = df[df['name'] == especie] #filtra por especie
 sub_df['Sub'].unique() #array(['C', 'N', 'P', 'NP'], dtype=object)
