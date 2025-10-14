@@ -14,8 +14,8 @@ def calculate_iWUE(iWUE):
  print("No Delete [C] m/m (%) values lower than 35%")
  #iWUE = iWUE.loc[iWUE['[C] m/m (%)'] >= 35]
 
- iWUE["t13C_cell"] = (delt13Cair- iWUE["δ13C (‰ v.s.V-PDB)"])/(1+(iWUE["δ13C (‰ v.s.V-PDB)"]/1000)) #HELP
- iWUE["Ci"] = (Cair*(iWUE["t13C_cell"]-a)+f*cP)/(b-a) #all same units %%
+ iWUE["△13C_cell"] = (delt13Cair- iWUE["δ13C (‰ v.s.V-PDB)"])/(1+(iWUE["δ13C (‰ v.s.V-PDB)"]/1000)) #HELP
+ iWUE["Ci"] = (Cair*(iWUE["△13C_cell"]-a)+f*cP)/(b-a) #all same units %%
  iWUE["Ci/Ca"]= iWUE["Ci"]/Cair #ratio of intercellular CO₂ concentration (Ci) to ambient CO₂ concentration (Ca)
  iWUE["iWUE (μmol/mol)"] = (Cair/1.6)*(1-(iWUE["Ci"]/Cair))
 
