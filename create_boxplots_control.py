@@ -1,0 +1,154 @@
+def create_boxplots_control(var, data):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import pandas as pd
+    from matplotlib.patches import Rectangle
+
+    # -----------------------------
+    # Data preparation
+    # -----------------------------
+    df_long = pd.melt(
+        data,
+        id_vars=["name", "Sub"],
+        value_vars=[var],
+        var_name="variable",
+        value_name="valor"
+    )
+
+    orden = ["C", "N", "P", "NP"]
+    df_long["Sub"] = pd.Categorical(df_long["Sub"], categories=orden, ordered=True)
+
+    altitud_map = {
+        "Weinmania  loxensis": "3000",
+        "Hedyosmun  purpurascens": "3000",
+        "Myrcia sp nov": "2000",
+        "Alchornea lojaensis": "2000",
+        "Pouteria torta": "1000",
+        "Clarisia  racemosa": "1000"
+    }
+    df_long["altitud"] = df_long["name"].map(altitud_map)
+
+    # -----------------------------
+    # FIXED ORDER OF 6 PANELS
+    # -----------------------------
+    final_order = [
+        "Clarisia  racemosa",   # 1000
+        "Myrcia sp nov",        # 2000
+        "Hedyosmun  purpurascens",  # 3000
+        "Pouteria torta",       # 1000
+        "Alchornea lojaensis",  # 2000
+        "Weinmania  loxensis"   # 3000
+    ]
+
+    df_long["name"] = pd.Categorical(df_long["name"], categories=final_order, ordered=True)
+
+    # -----------------------------
+    # Color palette
+    # -----------------------------
+    palette_Sub = {
+        "C": "#E3E9E9",
+        "N": "#07a868",
+        "P": "#F78504",
+        "NP": "#c90ccf",
+    }
+
+    sns.set(style="whitegrid")
+
+    # -----------------------------
+    # CREATE EXACTLY 6 AXES (2 × 3)
+    # -----------------------------
+    fig, axes = plt.subplots(2, 3, figsize=(8, 6.5), sharey=True)
+    axes = axes.flatten()
+
+    # -----------------------------
+    # PLOT EACH SPECIES
+    # -----------------------------
+    for i, sp in enumerate(final_order):
+        ax = axes[i]
+        subdf = df_long[df_long["name"] == sp]
+
+        sns.boxplot(
+            data=subdf,
+            x="Sub", y="valor",
+            palette=palette_Sub,
+            ax=ax
+        )
+
+        sns.swarmplot(
+            data=subdf,
+            x="Sub", y="valor",
+            color="grey",
+            dodge=False,
+            ax=ax,
+            alpha=0.8
+        )
+
+        # Mean control
+        control_mean = subdf[subdf["Sub"] == "C"]["valor"].mean()
+        if not pd.isna(control_mean):
+            ax.axhline(control_mean, linestyle="--", color="black", linewidth=1)
+
+        # Italic species name
+        ax.set_title(f"$\\it{{{sp}}}$", fontsize=12)
+
+        # Elevation box
+        elev = subdf["altitud"].iloc[0]
+        ax.text(
+            0.95, 0.95, f"{elev} m",
+            transform=ax.transAxes,
+            ha="right", va="top",
+            fontsize=10,
+            bbox=dict(facecolor="white", edgecolor="black")
+        )
+
+        ax.set_xlabel("")
+
+    # -----------------------------
+    # DRAW BIG BOXES FOR ALTITUDE GROUPS
+    # -----------------------------
+    # group_boxes = {
+    #    "1000 m": [0, 3],
+    #    "2000 m": [1, 4],
+    #    "3000 m": [2, 5]
+    #}
+
+    #for label, idxs in group_boxes.items():
+    #    ax_top = axes[idxs[0]]
+    #    ax_bottom = axes[idxs[1]]
+
+    #   pos_top = ax_top.get_position()
+    #    pos_bottom = ax_bottom.get_position()
+
+     #   x0 = pos_top.x0
+      #  y0 = pos_bottom.y0
+     #   width = pos_top.width
+     #   height = pos_top.y1 - pos_bottom.y0
+
+      #  rect = Rectangle(
+       #     (x0, y0), width, height,
+       #     transform=fig.transFigure,
+        #    fill=False,
+        #   lw=2,
+        #    edgecolor="black"
+        #)
+      #  fig.patches.append(rect)
+
+       # fig.text(
+       #     x0 + width/2,
+       #     pos_top.y1 + 0.01,
+       #     label,
+       #     ha="center",
+       #     fontsize=12,
+       #     fontweight="bold"
+        #)
+
+    # -----------------------------
+    # LABELS
+    # -----------------------------
+    fig.supxlabel("Treatment", fontsize=13)
+    fig.supylabel(var, fontsize=13)
+
+    fig.tight_layout()
+    return fig
+
+
