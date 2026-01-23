@@ -6,7 +6,8 @@ def calculate_iWUE(iWUE):
  cP = 40
  
  delt13Cair = -9.085684858  #data for 2024
- Cair = 423.1142299   #data for 2024 ManuLoa data.
+ Cair = 423.1142299   #data for 2024 ManuLoa data 423.114
+ #data for 2024 Napo mean is 458. Why is it so high?
  
  # clean values of C that are incorrect. Too low, less than 35%
  #iWUE = iWUE[iWUE['[C] m/m (%)'] >= 0.35]
