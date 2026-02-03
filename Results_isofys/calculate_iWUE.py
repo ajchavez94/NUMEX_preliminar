@@ -5,7 +5,7 @@ def calculate_iWUE(iWUE):
  f= 12
  cP = 40
  
- delt13Cair = -9.085684858  #data for 2024
+ delt13Cair = -9.085684858  #data for 2024 manu lloa. si cambia con elevacion. 
  Cair = 423.1142299   #data for 2024 ManuLoa data 423.114
  #data for 2024 Napo mean is 458. Why is it so high?
  
@@ -25,7 +25,6 @@ def calculate_iWUE(iWUE):
  #iWUE["Ci_2"] = (iWUE["Cair"]*(iWUE["△13C_cell_2"]-a/1000)+(f*cP/1000))/(b/1000-a/1000) #all same units %%
  #iWUE["iWUE (μmol/mol)_m2"] = (iWUE["Cair"]/1.6)*(1-(iWUE["Ci_2"]/iWUE["Cair"]))
  value = len(iWUE)
-
  print("No Cleaning negative values of iWUE (μmol/mol)")
  #iWUE = iWUE[iWUE['iWUE (μmol/mol)'] >= 1]
 
