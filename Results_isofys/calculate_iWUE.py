@@ -25,12 +25,13 @@ def formula_iWUE(iWUE,delt13Cair,Cair):
    
 def calculate_iWUE(iWUE,CO2):
     """ This script calculates iWUE from a given database. Only ask which source of CO2 we want to use"""
- 
+     #HELP: Once I have the results then maybe correct. Samuel
+     
  #Ask the user if we want Manu Lloa, if yes = 1, if No, observation = 0, 
     if CO2 == "on_site":
         # ---- on_site code ----
-        delt13Cair = -9.085684858  #data for 2024 manu lloa. si cambia con elevacion. 
-        Cair = 423.1142299   #data for 2024 ManuLoa data 423.114
+        delt13Cair = -9.085684858 #-9.420643812691782
+        Cair = 458.9521799015872  #data mean for Ecuador samples
         # data for 2024 Napo mean is 458. Why is it so high?
         iWUE = formula_iWUE(iWUE,delt13Cair,Cair)
         
