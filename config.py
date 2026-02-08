@@ -21,7 +21,7 @@ leaf_dry = "Leaf dry weight (g)"
 leaf_fresh = "Leaf fresh weight (g)"
 
 ### for nutrients ##
-Carea = "C_area" #Nleaf_C/SLA
-Narea = "N_area" #leaf_N/SLA
+Carea = "Carea" #Nleaf_C/SLA
+Narea = "Narea" #leaf_N/SLA
 
 functional_traits = [thick,mthough,LA,SLA,leaf_water,dry_matter,Carea,Narea]

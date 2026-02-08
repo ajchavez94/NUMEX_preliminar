@@ -1,5 +1,5 @@
 
-def create_boxplots_control(var,data, ax = None):
+def create_boxplots_control(var,data, ax):
  import matplotlib.pyplot as plt
  import seaborn as sns
  import pandas as pd
