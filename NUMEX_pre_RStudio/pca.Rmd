@@ -1,0 +1,92 @@
+---
+title: "PCA numex"
+author: "Andrea"
+date: "25/11/2025"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Creating document for 
+
+```{r cars}
+getwd()
+
+
+data_for_R <- read_excel('data_for_R.xlsx')
+```
+
+
+```{r cars}
+data = data_for_R
+# Keep only numeric columns
+
+library(dplyr)
+
+df_filtered <- data %>%
+  filter(elevation_m %in% c(1000,3000))#, 3000))
+
+df_group <- df_filtered$name
+
+df_numeric <- df_filtered[sapply(df_filtered, is.numeric)] #only numeric
+
+
+df_numeric <- df_numeric[ , !names(df_numeric) %in% c("code", "numer of leaves","number of leaves","dry matter content (mg/g)",	"C (mg/g)",	"N (mg/g)",	"P (mg/g)",	"Al (mg/g)","Ca (mg/g)","Fe (mg/g)","K (mg/g)",	"Mg (mg/g)","Na (mg/g)","S (mg/g)","Plot","TreeID")]#,"annual_precipitation_mm","elevation_m","mean_annual_temperature_C")] #remove also xero variance
+
+df_numeric <- df_numeric[, -1]
+```
+
+
+```{r}
+# Realizar el análisis de componentes principales con estandarización
+nad.pca.cor <- prcomp(df_numeric, center = TRUE, scale. = TRUE)
+```
+
+
+```{r}
+# Resumen de las varianzas explicadas por las componentes principales
+summary(nad.pca.cor) # Con estandarización
+```
+
+```{r}
+# Gráfico de sedimentación (scree plot) para el PCA con estandarización
+library(ggplot2)
+library(devtools)
+#install_github("vqv/ggbiplot")
+library(ggbiplot)
+
+ggscreeplot(nad.pca.cor, type = c('pev', 'cev')) +
+  xlab('Número de componentes principales') +
+  ylab('Proporción de la varianza explicada') +
+  geom_line(colour = 'royalblue') +
+  geom_point(colour = 'royalblue') +
+  ggtitle(" (Scree Plot)")
+```
+
+
+```{r}
+library(ggplot2)
+library("factoextra")
+library(gridExtra)
+library(FactoMineR)
+library("factoextra")
+
+# Combinar múltiples gráficos en una sola figura
+ggbiplot(nad.pca.cor, obs.scale = 1, var.scale = 1,
+  groups = df_group, ellipse = TRUE, circle = TRUE,ellipse.prob = 0.68) +
+  scale_color_discrete(name = '') +
+  theme(legend.direction = 'horizontal', legend.position = 'top')
+```
+```{r}
+fviz_pca_ind(nad.pca.cor,
+             habillage = df_group, # Color by the 'Species' group
+             label = "none",            # Do not show individual labels
+             addEllipses = TRUE,        # Add confidence ellipses around groups
+             ellipse.type = "convex",   # Use convex hull for ellipses
+             repel = TRUE,              # Avoid text overlapping
+             title = "PCA Plot with Species Categories")
+
+```
+

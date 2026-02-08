@@ -1,0 +1,202 @@
+---
+title: "Elevation species and treatment models"
+author: "Andrea"
+date: "18/12/2025"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set
+
+```
+```{r libraries}
+
+
+library(tidyverse)
+library(glmmTMB)
+library(DHARMa)
+library(ggplot2)
+library(scico)
+library(lmerTest)
+library(lme4)
+library(tables)
+library(dplyr)
+library(flextable)
+library(readxl)
+library(modelsummary)
+library(knitr)
+
+```
+
+# Elevation x treatment x species analysis
+
+```{r}
+
+getwd()
+data_for_R <- read_excel('data_for_R.xlsx')
+data = data_for_R
+
+data$Con <- ifelse(data$Sub == "C", 1, 0)
+data$N <- ifelse(data$Sub %in% c("N", "NP"), 1, 0)
+data$P <- ifelse(data$Sub %in% c("P", "NP"), 1, 0)
+
+```
+
+
+```{r Elevation Analysis}
+
+model_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P+N*P + elevation_m + (1 |name) + (1 |Plot), data = data) #iWUE (μmol/mol)
+model_iWUE_q <- lmer(`iWUE (μmol/mol)` ~ N+P+N*P + elevation_m + I(elevation_m^2) + (1|name)+ (1 |Plot), data = data)
+
+model_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P+N*P + elevation_m +(1 |name) + (1 |Plot), data = data)
+model_18O_q <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P+N*P + elevation_m  + I(elevation_m^2)+(1 |name) + (1 |Plot), data = data)
+
+model_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P+N*P + elevation_m +(1 |name) + (1 |Plot), data = data)
+model_15N_q <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P+N*P + elevation_m + I(elevation_m^2)+(1 |name) + (1 |Plot), data = data)
+data$CN_log <- log(data$`C:N`)
+
+model_CN <- lmer(`C:N` ~ N+P+N*P + (1 |name) + elevation_m +(1 |Plot), data = data)
+model_CN_2 <- lmer(`C:N` ~ N+P+N*P + (elevation_m|name)+(1 |Plot), data = data) #try to fix it with random slopes
+model_CN_3 <- lmer(`C:N` ~ N+P+N*P +elevation_m + I(elevation_m^2)+(1 |Plot), data = data) #try to fix it with random slopes
+
+
+```
+
+```{r table}
+models  <- list(
+  #"iWUE (μmol/mol)" = model_iWUE,
+  "qiWUE"=model_iWUE_q,
+  #"O18"  = model_18O,
+  "qO18" = model_18O_q,
+  "N15"  = model_15N,
+  "CN"   = model_CN,
+  "CN3"  = model_CN_2
+  )
+
+ 
+# exportar tabla
+tab <- modelsummary(
+  models,
+  output = "data.frame",
+  stars = TRUE,
+  gof_map = c("nobs", "r.squared", "aic")
+)
+
+# transponer
+tab_t <- as.data.frame(t(tab))
+
+# fijar nombres de columna usando la primera fila
+colnames(tab_t) <- tab_t[1, ]
+tab_t <- tab_t[-1, ]  # quitar fila original de nombres
+
+# mostrar tabla
+kable(tab_t)
+``` 
+
+```{r diagnostiscs common }
+
+plot_diagnostics <- function(model, model_name) {
+  
+  res <- residuals(model)#residual
+  fit <- fitted(model) #model
+  
+  par(mfrow = c(1, 2)) #graph
+  
+  # Residuals vs Fitted
+  plot(fit, res,
+       xlab = "Fitted values",
+       ylab = "Residuals",
+       main = paste(model_name, "\nResiduals vs Fitted"))
+  abline(h = 0, col = "red", lty = 2)
+  
+  # QQ plot
+  qqnorm(res, main = paste(model_name, "\nNormal Q-Q"))
+  qqline(res, col = "red", lty = 2)
+  
+  par(mfrow = c(1, 1))
+}
+
+#apply the plot_diagnostics_to_all
+pdf("model_diagnostics_all.pdf", width = 10, height = 5)
+
+for (nm in names(models)) {
+  plot_diagnostics(models[[nm]], nm)
+}
+
+dev.off()
+
+```
+```{r DHARMA diagnostics}
+# Run and plot
+for (nm in names(models)) {
+  cat("\n", nm, "\n")
+  res <- simulateResiduals(models[[nm]], n = 1000)
+  plot(res, main = nm)
+}
+
+testUniformity(res)
+testDispersion(res)
+testOutliers(res)
+
+pdf("DHARMa_diagnostics_all.pdf", width = 9, height = 7)
+
+for (nm in names(models)) {
+  res <- simulateResiduals(models[[nm]], n = 1000)
+  plot(res, main = nm)
+}
+
+dev.off()
+
+```
+
+
+
+```{r histograms}
+
+responses_vector <- c(
+  "iWUE (μmol/mol)",
+   "δ18O in ‰ vs DeltaSMOW",
+"δ15N (‰ v.s.AIR)", 
+"C:N") 
+
+min_val <- min(data$`δ18O in ‰ vs DeltaSMOW`, na.rm = TRUE)
+
+
+data <- data %>%
+  mutate(
+    d18O_num = as.numeric(`δ18O in ‰ vs DeltaSMOW`),
+    log_d18O = log(d18O_num - min_val + 1)
+  )
+
+
+plot_histograms <- function(data, var_name = "iWUE (μmol/mol)") {
+  
+  # set grid: 2 rows × 3 columns
+
+    # check if variable exists
+    
+    x <- df[[var_name]]
+    
+    # if no data
+    if (length(x) == 0 || !is.numeric(x)) {
+      plot.new()
+      title(main = paste("No data for:"))
+      next
+    }
+    
+    hist(x,
+         main = paste("Histogram:"),
+         xlab = var_name)
+  }
+
+hist(
+  data$log_d18O,
+  xlab = "log_18O",
+  col = "lightblue",
+  border = "black",
+  xlim = c(0, 5),
+  breaks = 5
+)
+
+```
+

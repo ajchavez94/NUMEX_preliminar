@@ -1,0 +1,500 @@
+---
+title: "Analisis per specie"
+author: "Andrea Chavez"
+date: "10/12/2025"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# PRELIMINAR ANALYSIS FOR NUMEX RESULTS.
+
+
+
+```{r libraries}
+
+
+library(tidyverse)
+library(glmmTMB)
+library(DHARMa)
+library(ggplot2)
+library(scico)
+library(lmerTest)
+library(lme4)
+library(tables)
+library(dplyr)
+library(flextable)
+library(readxl)
+
+```
+
+```{r Data}
+getwd()
+
+
+data_for_R <- read_excel('data_for_R.xlsx')
+
+data = data_for_R
+
+
+```
+
+```{r binary columns}
+# Crear columnas binarias manualmente para añadir fertilizacion
+data$Con <- ifelse(data$Sub == "C", 1, 0)
+data$N <- ifelse(data$Sub %in% c("N", "NP"), 1, 0)
+data$P <- ifelse(data$Sub %in% c("P", "NP"), 1, 0)
+
+```
+```{r function for species plot}
+library(ggplot2)
+library(patchwork)
+
+# Order Sub
+data$Sub <- factor(data$Sub, levels = c("C", "N", "P", "NP"))
+
+# Species order
+species_order <- c(
+  "Pouteria torta",
+  "Alchornea lojaensis",
+  "Weinmania  loxensis",
+  "Clarisia  racemosa",
+  "Myrcia sp nov",
+  "Hedyosmun  purpurascens"
+)
+
+data$name <- factor(data$name, levels = species_order)
+
+# Elevation map
+elevation_map <- c(
+  "Pouteria torta" = "1000 m",
+  "Alchornea lojaensis" = "2000 m",
+  "Weinmania  loxensis" = "3000 m",
+  "Clarisia  racemosa" = "1000 m",
+  "Myrcia sp nov" = "2000 m",
+  "Hedyosmun  purpurascens" = "3000 m"
+)
+
+# ===============================
+#   MAIN FUNCTION
+# ===============================
+make_species_plots <- function(yvar, y_label = yvar, y_limits = c(0, 150)) {
+  
+  # dynamic column reference
+  ycol <- rlang::sym(yvar)
+  
+  make_one_plot <- function(species_name) {
+    
+    df <- data[data$name == species_name, ]
+  
+    # mean of control
+    mean_control <- mean(df[df$Sub == "C", ][[yvar]], na.rm = TRUE)
+    
+    ggplot(df, aes(x = Sub, y = !!ycol, colour = Sub)) +
+      
+      geom_boxplot(aes(group = Sub),
+                   colour = "black",
+                   fill = "grey90",
+                   alpha = 0.5) +
+      
+      geom_hline(yintercept = mean_control,
+                 colour = "black",
+                 linetype = "dotted",
+                 linewidth = 1) +
+      
+      geom_jitter(width = 0.2, alpha = 0.6) +
+      
+      annotate("label",
+               x = 4, y = y_limits[2] - 1,
+               label = elevation_map[[species_name]],
+               fill = "white",
+               colour = "black",
+               size = 3) +
+      
+      scale_y_continuous(limits = y_limits) +
+      
+      labs(title = species_name,
+           x = "",
+           y = y_label) +
+      
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      }
+  
+  # Build 6 plots
+  p_list <- lapply(species_order, make_one_plot)
+  
+  final_plot <- ((p_list[[1]] | p_list[[2]] | p_list[[3]]) /
+                   (p_list[[4]] | p_list[[5]] | p_list[[6]])) +
+    plot_layout(guides = "collect") &
+    theme(legend.position = "bottom")
+  
+#ggsave("species_boxplots.png",
+ #      plot = final_plot,
+  #     width = 10, height = 10, units = "in", dpi = 300)
+
+  return(final_plot)
+}
+
+
+plot_iwue <- make_species_plots("δ18O in ‰ vs DeltaSMOW",
+                                y_label = "δ18O",
+                                y_limits = c(25,35))
+plot_iwue
+```
+```{r 13C/18O}
+library(ggplot2)
+
+ggplot(data, aes(x = `δ18O in ‰ vs DeltaSMOW`, 
+                 y = `δ13C (‰ v.s.V-PDB)`,colour = Sub)) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~ name, ncol = 3) +
+  theme_bw() +
+  labs(
+    x = expression(delta^{18}*O),
+    y = expression(delta^{13}*C),
+    title = "Relationship between δ13C and δ18O per species"
+  )
+
+
+```
+
+```{r histograms}
+
+species_vector <- c(
+  "Pouteria torta",
+  "Alchornea lojaensis",
+  "Weinmania  loxensis",
+  "Clarisia  racemosa",
+  "Myrcia sp nov",
+  "Hedyosmun  purpurascens"
+) 
+plot_6_species_histograms <- function(data, species_vector, var_name = "iWUE") {
+  
+  # set grid: 2 rows × 3 columns
+  par(mfrow = c(2, 3))
+  
+  for (sp in species_vector) {
+    df <- subset(data, name == sp)
+    
+    # check if variable exists
+    
+    x <- df[[var_name]]
+    
+    # if no data
+    if (length(x) == 0 || !is.numeric(x)) {
+      plot.new()
+      title(main = paste("No data for:", sp))
+      next
+    }
+    
+    hist(x,
+         main = paste("Histogram:", sp),
+         xlab = var_name)
+  }
+}
+plot_6_species_histograms(data, species_vector, var_name = "iWUE (μmol/mol)")
+
+
+```
+
+
+
+
+#ANOVA TEST for iWUE
+
+```{r ANOVA iWUE per species}
+#global ANOVA for all the samples
+#variables = δ18O in ‰ vs DeltaSMOW`
+  
+anova_species_treat <- aov( `iWUE (μmol/mol)`~ name * Sub, data = data) #Uses all dataset. Interaction between species and treatment
+summary(anova_species_treat)
+#Each specie is giving different responses.
+```
+
+I ran an ANOVA with interaction for the response variables. per each specie
+
+# Pouteria torta results. 
+
+```{r POUTERIA ANOVA}
+
+### Bombuscaro ####
+# Pouteria for isotopes results ##
+# other suggested model 
+datos_Pouteria <- data %>%
+filter(data$genus == "Pouteria")
+
+anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Pouteria)
+anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Pouteria)
+anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Pouteria)
+
+
+summary(anova_model_iWUE)
+summary(anova_model_18O)
+summary(anova_model_15N)
+
+# Simulate residuals
+sim1 <- simulateResiduals(fittedModel = anova_model_iWUE)
+sim2 <- simulateResiduals(fittedModel = anova_model_18O)
+sim3 <- simulateResiduals(fittedModel = anova_model_15N)
+
+# Plot 3 residual diagnostics in a grid
+par(mfrow = c(1, 3))  # 1 row x 3 columns
+
+plot(sim1)
+plot(sim2)
+plot(sim3)
+
+```
+###Pouteria:
+Some outliers were detected in Pouteria and may be removed for further analyses.
+```{r TABLA ANOVA RESULTS}
+library(dplyr)
+library(knitr)
+
+# Function to extract ANOVA stats (F, p, stars)
+extract_anova_info <- function(model) {
+  sm <- summary(model)[[1]]
+  
+  # Extract rows for N, P, and N:P
+  df <- data.frame(
+    Term = rownames(sm)[1:3],
+    F_value = sm$`F value`[1:3],
+    P_value = sm$`Pr(>F)`[1:3]
+  )
+  
+  # Round
+  df$F_value <- round(df$F_value, 2)
+  df$P_value <- round(df$P_value, 3)
+  
+  # Add significance stars
+  df$Signif <- sapply(df$P_value, function(p) {
+    if (p < 0.001) "***"
+    else if (p < 0.01) "**"
+    else if (p < 0.05) "*"
+    else ""
+  })
+  
+  return(df)
+}
+
+# Apply to your models
+tab_iWUE <- extract_anova_info(anova_model_iWUE)
+tab_O18  <- extract_anova_info(anova_model_18O)
+tab_N15  <- extract_anova_info(anova_model_15N)
+
+# Add variable name
+tab_iWUE$Variable <- "iWUE"
+tab_O18$Variable  <- "δ18O"
+tab_N15$Variable  <- "δ15N"
+
+# Combine all
+final_tab <- bind_rows(tab_iWUE, tab_O18, tab_N15) %>%
+  select(Variable, Term, F_value, P_value, Signif)
+
+# Print as markdown table
+kable(final_tab, format = "markdown", caption = "ANOVA Results (F, p, significance)")
+
+```
+
+##Intrinsic Water Use Efficiency (iWUE):
+No significant differences were found between treatments overall. However, the NP treatment approached significance (p = 0.0665). iWUE increased under N addition compared to the control. Under P addition, iWUE remained higher than in the control but was lower than under N alone. When both nutrients (NP) were added simultaneously, iWUE tended to decrease relative to the single-nutrient additions.
+
+##δ¹⁸O:
+There was a marginal effect of N addition (p = 0.052), with N decreasing δ¹⁸O values. The P
+treatment further reduced δ¹⁸O concentrations.
+
+##δ¹⁵N:
+No statistically significant differences were detected among treatments; however, δ¹⁵N values tended to be lower in the P treatment.
+
+
+
+
+
+```{r}
+#### Bombuscaro ####
+### Clarisia ####
+datos_Clarisia <- data %>%
+filter(data$genus == "Clarisia")
+
+anova_model_15N_cr <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Clarisia)
+
+anova_model_18O_cr <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Clarisia)
+
+anova_model_iWUE_cr <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Clarisia)
+
+summary(anova_model_iWUE_cr)
+summary(anova_model_18O_cr)
+summary(anova_model_15N_cr)
+
+## Para la Clarisia,, no hay ninguna diferencia en iWUE. En 18O, un poco efecto de N pero hubieron muy pocas muestras para adelantar conclusiones. En N, incrementa 18O. Transpira mas.In this case N has an effect on 15N for Clarisia.Lower 15N values in the N group.
+```
+
+```{r}
+## Cajanuma ####
+### Weinmania ####
+datos_Weinmania <- data %>%
+filter(data$genus == "Weinmania")
+
+
+anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Weinmania)
+
+anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Weinmania)
+
+anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Weinmania)
+
+summary(anova_model_iWUE)
+summary(anova_model_18O)
+summary(anova_model_15N)
+
+## For Weinmania. No significant effect on iWUE, marginal effect of P. Lower iWUE in P than C. Then for 18O and 15N no difference between treatments. 
+
+```
+
+```{r}
+#### Cajanuma #####
+### Hedyosmum purpurascens ####
+
+datos_Hedy <- data %>%
+filter(data$genus == "Hedyosmun")
+
+anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Hedy)
+
+anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Hedy)
+
+anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Hedy)
+
+summary(anova_model_iWUE)
+summary(anova_model_18O)
+summary(anova_model_15N)
+
+#Hedyosmum, no significant effect of any nutrient on these ecophysiological parameters. 
+```
+
+```{r}
+### San Francisco ########
+#### Myrcia #######
+datos_myrcia <- data %>%
+filter(data$name == "Myrcia sp nov")
+
+anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_myrcia)
+
+anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_myrcia)
+
+anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_myrcia)
+
+summary(anova_model_iWUE)
+summary(anova_model_18O)
+summary(anova_model_15N)
+
+modelsummary(list(anova_model_15N, anova_model_18O, anova_model_iWUE), 
+             output = "markdown", # or "html", "latex", "word", etc.
+             stars = TRUE, # Add significance stars
+             gof_map = c("nobs", "r.squared", "aic")) # 
+```
+Results: For Myrcia, there is no effect of nutrients on iWUE. Nevertheless there is an effect on 18O. The transpiration rate is higher on iWUE, but when adding P, starts decreasing. For 15N,, there is an effect of N, and the effect of the interaction N:P.Higher 15N, meaning......
+
+```{r}
+##### San Francisco #######
+## Alchornea ###
+datos_al <- data %>%
+filter(data$name == "Alchornea lojaensis")
+
+anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_al)
+
+anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_al)
+
+anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_al)
+
+summary(anova_model_iWUE)
+summary(anova_model_18O)
+summary(anova_model_15N)
+
+```
+Results: For Alchornea lojaensis, no effect on iWUE, no effect on 18O but strong effect of N on foliar 15N. 15N not absorbed similarly when P is added. 
+
+```{r}
+library(modelsummary)
+
+### Bombuscaro ####
+# Pouteria for isotopes results ##
+# other suggested model 
+
+# Reorder factors so "Control" is the reference
+
+# Fit model
+mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ N * P + (1 | Plot), data = datos_Pouteria)
+mod_O18_pt <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N * P + (1 | Plot), data = datos_Pouteria)
+#maybe delete outliers and see what happens. Values in P higher than 30. For the control values lower than 28. 
+mod_N15_pt <- lmer(`δ15N (‰ v.s.AIR)` ~ N * P + (1 | Plot), data = datos_Pouteria)
+
+mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ N * P + (1 | Plot), data = datos_Clarisia)
+mod_O18_cr<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N * P + (1 | Plot), data = datos_Clarisia)
+mod_N15_cr<- lmer(`δ15N (‰ v.s.AIR)` ~ N * P + (1 | Plot), data = datos_Clarisia)
+
+mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ N * P + (1 | Plot), data = datos_al)
+mod_O18_al<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N * P + (1 | Plot), data = datos_al)
+mod_N15_al<- lmer(`δ15N (‰ v.s.AIR)` ~ N * P + (1 | Plot), data = datos_al)
+
+mod_iWUE_my <- lmer(`iWUE (μmol/mol)` ~ N * P + (1 | Plot), data = datos_myrcia)
+mod_O18_my<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N * P + (1 | Plot), data = datos_myrcia)
+mod_N15_my<- lmer(`δ15N (‰ v.s.AIR)` ~ N * P + (1 | Plot), data = datos_myrcia)
+
+
+mod_iWUE_hp <- lmer(`iWUE (μmol/mol)` ~ N * P + (1 | Plot), data = datos_Hedy)
+mod_O18_hp<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N * P + (1 | Plot), data = datos_Hedy)
+mod_N15_hp<- lmer(`δ15N (‰ v.s.AIR)` ~ N * P + (1 | Plot), data = datos_Hedy)
+
+mod_iWUE_wl <- lmer(`iWUE (μmol/mol)` ~ N * P + (1 | Plot), data = datos_Weinmania)
+mod_O18_wl<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N * P + (1 | Plot), data = datos_Weinmania)
+mod_N15_wl<- lmer(`δ15N (‰ v.s.AIR)` ~ N * P + (1 | Plot), data = datos_Weinmania)
+#mod_iWUE_2 <- lmer(`iWUE (μmol/mol)` ~ Sub + (1 | Plot), data = datos_Pouteria) #HELP: Why
+
+
+# exportar tabla
+tab <- modelsummary(
+  list(
+    "Pouteria iWUE" = mod_iWUE_pt,
+    "O18 pt"  = mod_O18_pt,
+    "N15"  = mod_N15_pt,
+    "Clarisia iWUE" = mod_iWUE_cr,
+    "O18"  = mod_O18_cr,
+    "N15"  = mod_N15_cr,
+    "Alchornea iWUE" = mod_iWUE_al,
+    "O18"  = mod_O18_al,
+    "N15"  = mod_N15_al,
+    "Myrcia iWUE" = mod_iWUE_my,
+    "O18"  = mod_O18_my,
+    "N15"  = mod_N15_my,
+    "Hedyosmum iWUE" = mod_iWUE_hp,
+    "O18"  = mod_O18_hp,
+    "N15"  = mod_N15_hp,
+    "Weinmania iWUE" = mod_iWUE_wl,
+    "O18"  = mod_O18_wl,
+    "N15"  = mod_N15_wl
+  ),
+  output = "data.frame",
+  stars = TRUE,
+  gof_map = c("nobs", "r.squared", "aic")
+)
+
+# transponer
+tab_t <- as.data.frame(t(tab))
+
+# fijar nombres de columna usando la primera fila
+colnames(tab_t) <- tab_t[1, ]
+tab_t <- tab_t[-1, ]  # quitar fila original de nombres
+
+# mostrar tabla
+kable(tab_t)
+
+```
+
+
+
+
+
+
+
