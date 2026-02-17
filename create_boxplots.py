@@ -47,7 +47,7 @@ def create_boxplots_control(var,data, ax):
  sns.set(style="whitegrid")
 
  # Figura tamaño A4 reducido
- figsize_a4 = (5.27, 5.69)
+ #figsize_a4 = (5.27, 5.69)
 
  # Forzar el orden correcto de las altitudes
  orden_alt = ["1000", "2000", "3000"]
@@ -95,7 +95,7 @@ def create_boxplots_control(var,data, ax):
  g.set_titles(row_template="{row_name}", col_template="{col_name} m")
 
  # Ajustar figura
- g.fig.set_size_inches(figsize_a4)
+ #g.fig.set_size_inches(figsize_a4)
  g.fig.subplots_adjust(wspace=0.05, hspace=0.3)
 
  

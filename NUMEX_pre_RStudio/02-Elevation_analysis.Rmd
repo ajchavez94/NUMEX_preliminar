@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set
 
 ```
+
 ```{r libraries}
 
 
@@ -72,10 +73,10 @@ datos_3000 <- datos_3000%>%
       TRUE ~ NA_real_
     )
   )
-modelCaNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P+N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
-modelCaNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P+N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
-modelCaNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P+N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
-modelCaNu_CN <- lmer(`C:N` ~ N+P+N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+modelCaNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+modelCaNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+modelCaNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+modelCaNu_CN <- lmer(`C:N` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
 
 
 datos_1000 <- data %>%
@@ -91,10 +92,10 @@ datos_1000 <- datos_1000 %>%
       TRUE ~ NA_real_
     )
   )
-modelBoNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P+N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
-modelBoNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P+N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
-modelBoNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P+N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
-modelBoNu_CN <- lmer(`C:N` ~ N+P+N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+modelBoNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+modelBoNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+modelBoNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+modelBoNu_CN <- lmer(`C:N` ~ N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
 
 
 datos_2000 <- data %>%
@@ -112,10 +113,10 @@ datos_2000<- datos_2000 %>%
   )
 
 
-modelSF_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P+N*P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
-modelSF_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P+N*P + (1 |name) + (1 |Plot), data = datos_2000)
-modelSF_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P+N*P + (1 |name) + (1 |Plot), data = datos_2000)
-modelSF_CN <- lmer(`C:N` ~ N+P+N*P + (1 |name) + (1 |Plot), data = datos_2000)
+modelSF_iWUE <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
+modelSF_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
+modelSF_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
+modelSF_CN <- lmer(`C:N` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
 
 
 ### Results For BoNu for iWUE, there is a marginal effect of N and N:P but not significant. SF no effect.CaNu no effect.
@@ -128,18 +129,18 @@ modelSF_CN <- lmer(`C:N` ~ N+P+N*P + (1 |name) + (1 |Plot), data = datos_2000)
 models  <- list(
   "3000 m - iWUE (μmol/mol)" = modelCaNu_iWUE,
   "3000 m - O18"  = modelCaNu_18O,
-  "3000 m - N15"  = modelCaNu_15N,
-  "3000 m - CN"   = modelCaNu_CN,
+  #"3000 m - N15"  = modelCaNu_15N,
+  #"3000 m - CN"   = modelCaNu_CN,
 
   "2000 m iWUE" = modelSF_iWUE,
   "2000 m O18"  = modelSF_18O,
-  "2000 m N15"  = modelBoNu_15N,
-  "2000 m CN"   = modelSF_CN,
+  #"2000 m N15"  = modelBoNu_15N,
+  #"2000 m CN"   = modelSF_CN,
 
   "1000 m iWUE" = modelBoNu_iWUE,
-  "1000 m O18"  = modelBoNu_18O,
-  "1000 m N15"  = modelBoNu_15N,
-  "1000 m CN"   = modelBoNu_CN)
+  "1000 m O18"  = modelBoNu_18O)
+  #"1000 m N15"  = modelBoNu_15N,
+  #"1000 m CN"   = modelBoNu_CN)
 
  
 # exportar tabla
@@ -230,7 +231,6 @@ modelSF_CN <- lmer(`C:N` ~ N+P + (1 |name) + (1 |Plot), data = datos_2000)
 ### Results For BoNu for iWUE, there is a marginal effect of N and N:P but not significant. SF no effect.CaNu no effect.
 
 
-```
 ```
 
 

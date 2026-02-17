@@ -40,37 +40,69 @@ data$Con <- ifelse(data$Sub == "C", 1, 0)
 data$N <- ifelse(data$Sub %in% c("N", "NP"), 1, 0)
 data$P <- ifelse(data$Sub %in% c("P", "NP"), 1, 0)
 
+### transformation for other models.
+data$iWUElog <- log(data$`iWUE (μmol/mol)`)
+
 ```
 
 
 ```{r Elevation Analysis}
+#Help bloque en python
+#modelos para iWUE y sus variaciones para escoger el mejor.
 
-model_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P+N*P + elevation_m + (1 |name) + (1 |Plot), data = data) #iWUE (μmol/mol)
-model_iWUE_q <- lmer(`iWUE (μmol/mol)` ~ N+P+N*P + elevation_m + I(elevation_m^2) + (1|name)+ (1 |Plot), data = data)
+model_iWUE <- lmer(`iWUE (μmol/mol)` ~ N*P + elevation_m + (1 |name) + (1 |Plot), data = data) #iWUE (μmol/mol)
+model_iWUElog <- lmer(`iWUElog` ~ N*P + elevation_m + (1 |name) + (1 |Plot), data = data) #iWUE (μmol/mol)
+model_iWUE_anidado <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 |name) + elevation_m+(1 |elevation_m/Plot), data = data) #iWUE (μmol/mol)
+model_iWUE_q <- lmer(`iWUE (μmol/mol)` ~ N*P + elevation_m + I(elevation_m^2) + (1|name)+ (1 |Plot), data = data)#elevacion como fijo y aletorio. 
 
-model_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P+N*P + elevation_m +(1 |name) + (1 |Plot), data = data)
-model_18O_q <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P+N*P + elevation_m  + I(elevation_m^2)+(1 |name) + (1 |Plot), data = data)
+### about the 18O
+model_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + elevation_m +(1 |name) + (1 |Plot), data = data)
+model_18O_q <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + elevation_m  + I(elevation_m^2)+(1 |name) + (1 |Plot), data = data)
 
-model_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P+N*P + elevation_m +(1 |name) + (1 |Plot), data = data)
-model_15N_q <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P+N*P + elevation_m + I(elevation_m^2)+(1 |name) + (1 |Plot), data = data)
-data$CN_log <- log(data$`C:N`)
+#Not included models
+#model_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + elevation_m +(1 |name) + (1 |Plot), data = data)
+#model_15N_q <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + elevation_m + I(elevation_m^2)+(1 |name) + (1 |Plot), data = data)
 
-model_CN <- lmer(`C:N` ~ N+P+N*P + (1 |name) + elevation_m +(1 |Plot), data = data)
-model_CN_2 <- lmer(`C:N` ~ N+P+N*P + (elevation_m|name)+(1 |Plot), data = data) #try to fix it with random slopes
-model_CN_3 <- lmer(`C:N` ~ N+P+N*P +elevation_m + I(elevation_m^2)+(1 |Plot), data = data) #try to fix it with random slopes
+#data$CN_log <- log(data$`C:N`)
+
+#model_CN <- lmer(`C:N` ~ N*P + (1 |name) + elevation_m +(1 |Plot), data = data)
+#model_CN_2 <- lmer(`C:N` ~ N*P + (elevation_m|name)+(1 |Plot), data = data) #try to fix it with random slopes
+#model_CN_3 <- lmer(`C:N` ~ N*P +elevation_m + I(elevation_m^2)+(1 |Plot), data = data) #try to fix it with random slopes
 
 
+```
+```{r functional traits}
+#first scale numeric variables
+data$scalCarea <- scale(data$Carea)
+data$scalNarea <- scale(data$Narea)
+data$scalPunch <- scale(data$`force to punch (kN/m)`)
+data$scalThick <- scale(data$`thickness (mm)`)
+data$scalLA <- scale(data$`Leaf area (cm²)`)
+data$scalSLA <- scale(data$`Specific leaf area (g/cm²)`)
+data$scalWD <- scale(data$WD)
+
+  
+data$`leaf water content`  
+model_iWUE_traits <- lmer(`iWUE (μmol/mol)` ~ N*P  + scalCarea+scalNarea+ scalPunch+ 
+                            scalThick +scalLA + scalSLA +scalWD+ elevation_m+ (1 |name) + (1 |Plot), data = data) #iWUE (μmol/mol)
+mod_iWUE_vif <- lm(`iWUE (μmol/mol)` ~ N*P  + scalCarea+scalNarea+ scalPunch+ 
+                            scalThick +scalLA + scalSLA + elevation_m, data = data) 
+library(car)
+vif(mod_iWUE_vif)
 ```
 
 ```{r table}
 models  <- list(
-  #"iWUE (μmol/mol)" = model_iWUE,
+  "iWUE (μmol/mol)" = model_iWUE,
+  "model_iWUE_anidado" = model_iWUE_anidado,
+  "model_iWUElog" = model_iWUElog,
+  "model_iWUE_traits"=model_iWUE_traits,
   "qiWUE"=model_iWUE_q,
-  #"O18"  = model_18O,
-  "qO18" = model_18O_q,
-  "N15"  = model_15N,
-  "CN"   = model_CN,
-  "CN3"  = model_CN_2
+  "O18"  = model_18O,
+  "qO18" = model_18O_q
+  #"N15"  = model_15N,
+  #"CN"   = model_CN,
+  #"CN3"  = model_CN_2
   )
 
  
@@ -127,6 +159,7 @@ dev.off()
 
 ```
 ```{r DHARMA diagnostics}
+
 # Run and plot
 for (nm in names(models)) {
   cat("\n", nm, "\n")
