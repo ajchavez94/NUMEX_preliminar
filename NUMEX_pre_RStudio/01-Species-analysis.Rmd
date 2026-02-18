@@ -560,13 +560,27 @@ The interaction is only relevant for one species. The Pouteris and Myrcia N15.
 #Decidir que nomás quiero.
 #SLA, Carea, Narea,
 # Fit model
+
+library("sjPlot")
+library("sjmisc")
+library("sjlabelled")
+
 mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque/Plot), data = datos_Pouteria)
 mod_O18_pt <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + (1 | Bloque/Plot), data = datos_Pouteria)
 mod_N15_pt <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
 mod_CN_pt <- lmer(`C:N` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
 mod_N_pt <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
 mod_Narea_pt <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
+```
 
+
+```{r modelos }
+plot_model(mod_iWUE_pt, title="Test", axis.title="Coefficient",
+           show.values = TRUE, value.offset = .3)
+```
+
+
+```{r modelos }
 mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque/Plot), data = datos_Clarisia)
 mod_O18_cr<- lmer(`δ18O in ‰ vs DeltaSMOW` ~N*P  + (1 | Bloque/Plot), data = datos_Clarisia)
 mod_N15_cr<- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + (1 | Bloque/Plot), data = datos_Clarisia)
@@ -652,7 +666,7 @@ tab <- modelsummary(
   models,
   output = "data.frame",
   stars = TRUE,
-  gof_map = c("nobs", "r.squared","adj.squared","r2.marginal","r2.condicional", "aic")
+  gof_map = c("nobs", "r.adjusted","adj.squared","r2.marginal","r2.condicional", "aic")
 )
 
 # transponer
@@ -667,6 +681,24 @@ kable(tab_t)
 
 ```
 Modelo mejora con la interaccion. Mira AIC. 
+
+```{r}
+
+mod_iWUE_w <- lmer(`iWUE (μmol/mol)` ~ Sub + (1 | Bloque/Plot), data = datos_Weinmania)
+
+plot_model(
+  mod_iWUE_al,
+  type = "est",
+  ci.lvl = 0.95,
+  show.values = TRUE,
+  value.offset = 0.3,
+  title = "Test",
+  vline.color = "red",
+) 
+
+summary(mod_iWUE_pt)
+```
+
 ```{r diagnostiscs common }
 
 plot_diagnostics <- function(model, model_name) {

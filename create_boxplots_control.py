@@ -7,6 +7,15 @@ def create_boxplots_control(var, data):
     # -----------------------------
     # Data preparation
     # -----------------------------
+    if var == "Narea":
+           print("Cleaning outliers of Narea")
+           data = data[data["Narea"] <= 0.5] #only maintain values lower than 0.5
+    
+    elif var == "[N]":
+           print("Cleaning outliers of Narea")
+           data = data[data["N"] <= 0.025] #only maintain values lower than 0.5
+    
+
     df_long = pd.melt(
         data,
         id_vars=["name", "Sub"],
@@ -66,11 +75,13 @@ def create_boxplots_control(var, data):
     for i, sp in enumerate(final_order):
         ax = axes[i]
         subdf = df_long[df_long["name"] == sp]
+        
 
         sns.boxplot(
             data=subdf,
             x="Sub", y="valor",
             palette=palette_Sub,
+            showmeans=True,
             ax=ax
         )
 
@@ -103,46 +114,7 @@ def create_boxplots_control(var, data):
 
         ax.set_xlabel("")
 
-    # -----------------------------
-    # DRAW BIG BOXES FOR ALTITUDE GROUPS
-    # -----------------------------
-    # group_boxes = {
-    #    "1000 m": [0, 3],
-    #    "2000 m": [1, 4],
-    #    "3000 m": [2, 5]
-    #}
 
-    #for label, idxs in group_boxes.items():
-    #    ax_top = axes[idxs[0]]
-    #    ax_bottom = axes[idxs[1]]
-
-    #   pos_top = ax_top.get_position()
-    #    pos_bottom = ax_bottom.get_position()
-
-     #   x0 = pos_top.x0
-      #  y0 = pos_bottom.y0
-     #   width = pos_top.width
-     #   height = pos_top.y1 - pos_bottom.y0
-
-      #  rect = Rectangle(
-       #     (x0, y0), width, height,
-       #     transform=fig.transFigure,
-        #    fill=False,
-        #   lw=2,
-        #    edgecolor="black"
-        #)
-      #  fig.patches.append(rect)
-
-       # fig.text(
-       #     x0 + width/2,
-       #     pos_top.y1 + 0.01,
-       #     label,
-       #     ha="center",
-       #     fontsize=12,
-       #     fontweight="bold"
-        #)
-
-    # -----------------------------
     # LABELS
     # -----------------------------
     fig.supxlabel("Treatment", fontsize=13)
