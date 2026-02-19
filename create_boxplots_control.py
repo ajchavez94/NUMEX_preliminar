@@ -7,13 +7,13 @@ def create_boxplots_control(var, data):
     # -----------------------------
     # Data preparation
     # -----------------------------
-    if var == "Narea":
-           print("Cleaning outliers of Narea")
-           data = data[data["Narea"] <= 0.5] #only maintain values lower than 0.5
+    #if var == "Narea":
+    #       print("Cleaning outliers of Narea")
+    #       data = data[data["Narea"] <= 0.5] #only maintain values lower than 0.5
     
-    elif var == "[N]":
-           print("Cleaning outliers of Narea")
-           data = data[data["N"] <= 0.025] #only maintain values lower than 0.5
+    #elif var == "[N]":
+    #       print("Cleaning outliers of Narea")
+    #       data = data[data["[N]"] <= 0.025] #only maintain values lower than 0.025
     
 
     df_long = pd.melt(
@@ -55,10 +55,10 @@ def create_boxplots_control(var, data):
     # Color palette
     # -----------------------------
     palette_Sub = {
-        "C": "#E3E9E9",
-        "N": "#07a868",
-        "P": "#F78504",
-        "NP": "#c90ccf",
+        "C": "#A3A3A3",
+        "N": "#70b7f5",
+        "P": "#F7AC58FF",
+        "NP": "#f080ca",
     }
 
     sns.set(style="whitegrid")
@@ -76,23 +76,30 @@ def create_boxplots_control(var, data):
         ax = axes[i]
         subdf = df_long[df_long["name"] == sp]
         
-
         sns.boxplot(
             data=subdf,
             x="Sub", y="valor",
-            palette=palette_Sub,
+            #palette=palette_Sub,
+            color=".9", 
+            linecolor="#137", linewidth=.85,
             showmeans=True,
+            meanprops={"marker": "s",
+                       "markerfacecolor": "black",
+                        "markeredgecolor":"black",
+                       "markersize": "4"},
             ax=ax
         )
 
         sns.swarmplot(
             data=subdf,
             x="Sub", y="valor",
+            palette=palette_Sub,
             color="grey",
             dodge=False,
             ax=ax,
-            alpha=0.8
+            alpha=0.9
         )
+
 
         # Mean control
         control_mean = subdf[subdf["Sub"] == "C"]["valor"].mean()
@@ -100,7 +107,8 @@ def create_boxplots_control(var, data):
             ax.axhline(control_mean, linestyle="--", color="black", linewidth=1)
 
         # Italic species name
-        ax.set_title(f"$\\it{{{sp}}}$", fontsize=12)
+        formatted_name = sp.replace(' ', '.') # e.g.
+        ax.set_title(f"$\\it{{{formatted_name}}}$", fontsize=10)
 
         # Elevation box
         elev = subdf["altitud"].iloc[0]

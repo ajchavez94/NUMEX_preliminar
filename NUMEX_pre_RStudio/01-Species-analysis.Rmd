@@ -41,18 +41,21 @@ data = data_for_R
 
 ```
 
-```{r binary columns}
+```{r transformando columnas}
 
 # Crear columnas binarias manualmente para añadir fertilizacion
+#columnas binarias
 data$Con <- ifelse(data$Sub == "C", 1, 0)
 data$N <- ifelse(data$Sub %in% c("N", "NP"), 1, 0)
 data$P <- ifelse(data$Sub %in% c("P", "NP"), 1, 0)
 
+data$logNmass <- log(data$`[N]`)
+data$logNarea <- log(data$Narea)
 
 data <- data %>%
   mutate(d15N_centered = scale(`δ15N (‰ v.s.AIR)`, center = TRUE, scale = FALSE)[,1])
 
-#adding the blocks
+#adding the blocks ONLY WORKS FOR CANU Y BONU
 data <- data %>%
   mutate(
     Bloque = case_when(
@@ -64,6 +67,8 @@ data <- data %>%
     )
   )
 ```
+
+
 
 ```{r function for species plot}
 
@@ -180,12 +185,6 @@ plot_N <- make_species_plots("[N]",
 plot_Narea <- make_species_plots("Narea",
                                 y_label = "Narea",
                                 y_limits = c(0,0.5))
-plot_iwue
-plot_18O
-plot_15N
-plot_CN
-plot_N
-plot_Narea
 
 ```
 The graphic for C13/o18 are created in python.
@@ -257,10 +256,7 @@ summary(anova_species_treat)
 #Each specie is giving different responses.
 ```
 
-I ran an ANOVA with interaction for the response variables. per each specie
-
-### Pouteria torta
-No problems detected with the QQ plots and residuals distribution.
+### ANOVA 1000
 
 ```{r 1000 m}
 
@@ -270,7 +266,9 @@ No problems detected with the QQ plots and residuals distribution.
 datos_Pouteria <- data %>%
 filter(data$genus == "Pouteria")
 
-anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Pouteria)
+datos_Pouteria_filtered <- datos_Pouteria[datos_Pouteria$`iWUE (μmol/mol)` < 100, ]
+
+anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Pouteria_filtered)#keep all the rest
 anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Pouteria)
 anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Pouteria)
 anova_model_CN <- aov(`C:N` ~ N * P, data = datos_Pouteria)
@@ -296,7 +294,7 @@ anova_model_CN_cr <- aov(`C:N` ~ N * P, data = datos_Clarisia)
 
 
 ```
-
+### ANOVA 2000
 ```{r anova 2000m}
 
 ##### San Francisco #######
@@ -346,6 +344,8 @@ anova_model_iWUE_m <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_myrcia)
 anova_model_CN_m <- aov(`C:N` ~ N * P, data = datos_myrcia)
 
 ```
+### ANOVA 3000
+
 
 ```{r anova 3000 m}
 #### Cajanuma #####
@@ -378,7 +378,7 @@ anova_model_CN_Hp <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Hp)
 
 #Hedyosmum, no significant effect of any nutrient on these ecophysiological parameters. 
 ```
-
+#### TABLA ANOVA 1000
 ```{r TABLAS ANOVA 1000 }
 
 mods_1000 <- list(
@@ -411,6 +411,8 @@ d18I for N,
 d15N for N
 C:N for N
 Clarisia N is important.
+
+#### TABLA ANOVA 2000
 ```{r TABLAS ANOVA 2000}
 
 mods_2000 <- list(
@@ -435,6 +437,8 @@ modelsummary(
 Alchornea or Myrcia. ## HELP error with a database
 C:N influenced by N (p=0.018)
 
+#### TABLA ANOVA 3000
+
 ```{r TABLAS ANOVA 3000}
 
 mods_3000 <- list(
@@ -458,7 +462,8 @@ modelsummary(
   title = "ANOVA results for *3000 species*")
   
 ```
-## Modelos lineares mixtos con interaccion
+# Modelos lineares mixtos 
+## MODELOS SIN INTERACCION 
 Se elimina de todos N+P por redundancia
 
 ```{r IGNORAR modelos lineares por especie con N+P}
@@ -555,15 +560,8 @@ kable(tab_t)
 ```
 The interaction is only relevant for one species. The Pouteris and Myrcia N15.
 
-
+## MODELOS CON INTERACCION
 ```{r modelos }
-#Decidir que nomás quiero.
-#SLA, Carea, Narea,
-# Fit model
-
-library("sjPlot")
-library("sjmisc")
-library("sjlabelled")
 
 mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque/Plot), data = datos_Pouteria)
 mod_O18_pt <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + (1 | Bloque/Plot), data = datos_Pouteria)
@@ -571,22 +569,17 @@ mod_N15_pt <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P+ (1 | Bloque/Plot), data = datos_
 mod_CN_pt <- lmer(`C:N` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
 mod_N_pt <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
 mod_Narea_pt <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
-```
+mod_logNarea_pt <- lmer(`logNarea` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
+mod_logNmass_pt <- lmer(`logNmass` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
 
-
-```{r modelos }
-plot_model(mod_iWUE_pt, title="Test", axis.title="Coefficient",
-           show.values = TRUE, value.offset = .3)
-```
-
-
-```{r modelos }
 mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque/Plot), data = datos_Clarisia)
 mod_O18_cr<- lmer(`δ18O in ‰ vs DeltaSMOW` ~N*P  + (1 | Bloque/Plot), data = datos_Clarisia)
 mod_N15_cr<- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + (1 | Bloque/Plot), data = datos_Clarisia)
 mod_CN_cr<- lmer(`C:N` ~N*P+ (1 | Bloque/Plot), data = datos_Clarisia)
 mod_N_cr <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_Clarisia)
 mod_Narea_cr <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_Clarisia)
+mod_logNarea_cr <- lmer(`logNarea` ~ N*P+ (1 | Bloque/Plot), data = datos_Clarisia)
+mod_logNmass_cr <- lmer(`logNmass` ~ N*P+ (1 | Bloque/Plot), data = datos_Clarisia)
 
 mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque/Plot), data = datos_al)
 mod_O18_al<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + (1 | Bloque/Plot), data = datos_al)
@@ -594,6 +587,8 @@ mod_N15_al<- lmer(`δ15N (‰ v.s.AIR)` ~ N*P+  (1 | Bloque/Plot), data = datos_
 mod_CN_al<- lmer(`C:N` ~N*P + (1 | Bloque/Plot), data = datos_al)
 mod_N_al <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_al)
 mod_Narea_al <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_al)
+mod_logNarea_al <- lmer(`logNarea` ~ N*P+ (1 | Bloque/Plot), data = datos_al)
+mod_logNmass_al <- lmer(`logNmass` ~ N*P+ (1 | Bloque/Plot), data = datos_al)
 
 mod_iWUE_my <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque/Plot), data = datos_myrcia)
 mod_O18_my<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P+ (1 | Bloque/Plot), data = datos_myrcia)
@@ -601,15 +596,17 @@ mod_N15_my<- lmer(`δ15N (‰ v.s.AIR)` ~N*P+ (1 | Bloque/Plot), data = datos_my
 mod_CN_my<- lmer(`C:N` ~ N*P+ (1 | Bloque/Plot), data = datos_myrcia)
 mod_N_my <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_myrcia)
 mod_Narea_my <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_myrcia)
-
+mod_logNarea_my <- lmer(`logNarea` ~ N*P+ (1 | Bloque/Plot), data = datos_myrcia)
+mod_logNmass_my <- lmer(`logNmass` ~ N*P+ (1 | Bloque/Plot), data = datos_myrcia)
 
 mod_iWUE_hp <- lmer(`iWUE (μmol/mol)` ~N*P+ (1 | Bloque/Plot), data = datos_Hp)
 mod_O18_hp<- lmer(`δ18O in ‰ vs DeltaSMOW` ~N*P+  (1 | Bloque/Plot), data = datos_Hp)
 mod_N15_hp<- lmer(`δ15N (‰ v.s.AIR)` ~ N*P+(1 | Bloque/Plot), data = datos_Hp)
 mod_CN_hp<- lmer(`C:N` ~ N*P + (1 | Bloque/Plot), data = datos_Hp)
-mod_N_hp <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
-mod_Narea_hp <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_Pouteria)
-
+mod_N_hp <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_Hp)
+mod_Narea_hp <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_Hp)
+mod_logNarea_hp <- lmer(`logNarea` ~ N*P+ (1 | Bloque/Plot), data = datos_Hp)
+mod_logNmass_hp <- lmer(`logNmass` ~ N*P+ (1 | Bloque/Plot), data = datos_Hp)
 
 mod_iWUE_wl <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque/Plot), data = datos_Weinmania)
 mod_O18_wl<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N*P + (1 | Bloque/Plot), data = datos_Weinmania)
@@ -617,7 +614,11 @@ mod_N15_wl<- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + (1 | Bloque/Plot), data = datos_
 mod_CN_wl<- lmer(`C:N` ~ N + P + (1 | Bloque/Plot), data = datos_Weinmania)
 mod_N_wl <- lmer(`[N]` ~ N*P+ (1 | Bloque/Plot), data = datos_Weinmania)
 mod_Narea_wl <- lmer(`Narea` ~ N*P+ (1 | Bloque/Plot), data = datos_Weinmania)
+mod_logNarea_wl <- lmer(`logNarea` ~ N*P+ (1 | Bloque/Plot), data = datos_Weinmania)
+mod_logNmass_wl <- lmer(`logNmass` ~ N*P+ (1 | Bloque/Plot), data = datos_Weinmania)
 
+
+## Creates a list with all the models
 models  <- list(
   "Pouteria iWUE" = mod_iWUE_pt,
   "Pouteria O18"  = mod_O18_pt,
@@ -625,6 +626,8 @@ models  <- list(
   #"Pouteria CN"   = mod_CN_pt,
   "Pouteria Nmass"=mod_N_pt,
   "Pouteria Narea"=mod_Narea_pt,
+  "Pouteria logNmass"= mod_logNmass_pt,
+  "Pouteria logNarea"= mod_logNarea_wl,
 
   "Clarisia iWUE" = mod_iWUE_cr,
   "Clarisia O18"  = mod_O18_cr,
@@ -632,6 +635,9 @@ models  <- list(
   #"Clarisia CN"   = mod_CN_cr,
   "Clarisia Nmass" = mod_N_cr,
   "Clarisia Narea" = mod_Narea_cr,
+  "Clar logNmass"= mod_logNmass_cr,
+  "Clar logNarea"= mod_logNarea_cr,
+
 
   "Alchornea iWUE" = mod_iWUE_al,
   "Alchornea O18"  = mod_O18_al,
@@ -639,6 +645,9 @@ models  <- list(
   #"Alchornea CN"   = mod_CN_al,
   "Alchornea Nmass"=mod_N_al,
   "Alchornea Narea"=mod_Narea_al,
+    "Alchornea logNmass"= mod_logNmass_al,
+  "Alchornea logNarea"= mod_logNarea_al,
+
 
   "Myrcia iWUE" = mod_iWUE_my,
   "Myrcia O18"  = mod_O18_my,
@@ -646,6 +655,9 @@ models  <- list(
   #"Myrcia CN"   = mod_CN_my,
   "Myrcia Nmass" = mod_N_my,
   "Myrcia Narea"  = mod_Narea_my,
+    "Myrcia logNmass"= mod_logNmass_my,
+  "Myrcia logNarea"= mod_logNarea_my,
+
 
   "Hedyosmum iWUE" = mod_iWUE_hp,
   "Hedyosmum O18"  = mod_O18_hp,
@@ -653,11 +665,17 @@ models  <- list(
   #"Hedyosmum CN"   = mod_CN_hp,
   "Hedyosmum Nmass" = mod_N_hp,
   "Hedyosmum Narea"  = mod_Narea_hp,
+   "Hedyosmum logNmass"= mod_logNmass_hp,
+  "Hedyosmum logNarea"= mod_logNarea_hp,
+
 
   "Weinmania iWUE" = mod_iWUE_wl,
   "Weinmania O18"  = mod_O18_wl,
    "Weinmania Nmass" = mod_N_wl,
-  "Weinmania Narea"  = mod_Narea_wl
+  "Weinmania Narea"  = mod_Narea_wl,
+  "Weinmania logNmass"= mod_logNmass_wl,
+  "Weinmania logNarea"= mod_logNarea_wl
+
 )
   #"Weinmania N15"  = mod_N15_wl,
   #"Weinmania CN"   = mod_CN_wl)
@@ -680,24 +698,29 @@ tab_t <- tab_t[-1, ]  # quitar fila original de nombres
 kable(tab_t)
 
 ```
-Modelo mejora con la interaccion. Mira AIC. 
-
+Modelo mejora con la interaccion. Mira AIC.
+#### GRAFICOS MODELOS INTERACCION
 ```{r}
 
-mod_iWUE_w <- lmer(`iWUE (μmol/mol)` ~ Sub + (1 | Bloque/Plot), data = datos_Weinmania)
+library("sjPlot")
+library("sjmisc")
+library("sjlabelled")
 
-plot_model(
-  mod_iWUE_al,
-  type = "est",
-  ci.lvl = 0.95,
-  show.values = TRUE,
-  value.offset = 0.3,
-  title = "Test",
-  vline.color = "red",
-) 
 
-summary(mod_iWUE_pt)
 ```
+
+```{r}
+plot_model(mod_iWUE_pt, title="Pouteria torta", axis.title="Coefficient", show.values = TRUE, value.offset = .3)
+plot_model(mod_iWUE_al, title="Alchornea lojaensis", axis.title="Coefficient", show.values = TRUE, value.offset = .3)
+plot_model(mod_iWUE_cr, title="Clarisia racemosa", axis.title="Coefficient", show.values = TRUE, value.offset = .3)
+plot_model(mod_iWUE_my, title="Myrcia", axis.title="Coefficient", show.values = TRUE, value.offset = .3)
+plot_model(mod_iWUE_hp, title="Hedyosmum", axis.title="Coefficient", show.values = TRUE, value.offset = .3)
+plot_model(mod_iWUE_wl, title="Weinmania", axis.title="Coefficient", show.values = TRUE, value.offset = .3)
+
+```
+
+
+
 
 ```{r diagnostiscs common }
 

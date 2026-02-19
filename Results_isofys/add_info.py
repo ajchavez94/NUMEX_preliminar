@@ -49,3 +49,30 @@ def add_specie_info(df):
 
     df = df.apply(fill_info, axis=1)
     return df
+
+import numpy as np
+import pandas as pd 
+
+def add_bloque_info(df):
+   """Adds information on the bloque based on the Plot ID whith a difference for SFNU where they have Ca"""
+   df["Bloque"] = np.nan
+   #df["Plot"] = df["Plot"].str.strip()
+   #df["Plot"] = pd.to_numeric(df["Plot"])#, errors="coerce")
+
+   # Rule for Site == "SFNU"
+   mask_sfnu = df["Site"] == "SFNu" #only apply rule for SF
+   df.loc[mask_sfnu & df["Plot"].between(1, 4),  "Bloque"] = 1
+   df.loc[mask_sfnu & df["Plot"].between(6, 9),  "Bloque"] = 2
+   df.loc[mask_sfnu & df["Plot"].between(11, 14), "Bloque"] = 3
+   df.loc[mask_sfnu & df["Plot"].between(15, 20), "Bloque"] = 4
+    
+   # Rule for all other sites
+   mask_other = df["Site"] != "SFNu"
+   print("Adding information of the Bloque to SF")
+   df.loc[mask_other & df["Plot"].between(1, 4),   "Bloque"] = 1
+   df.loc[mask_other & df["Plot"].between(5, 8),   "Bloque"] = 2
+   df.loc[mask_other & df["Plot"].between(9, 12),  "Bloque"] = 3
+   df.loc[mask_other & df["Plot"].between(13, 16), "Bloque"] = 4
+
+   print("Information of the bloque was added")
+   return df
