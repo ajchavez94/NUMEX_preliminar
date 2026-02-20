@@ -24,4 +24,4 @@ leaf_fresh = "Leaf fresh weight (g)"
 Carea = "Carea" #Nleaf_C/SLA
 Narea = "Narea" #leaf_N/SLA
 
-functional_traits = [thick,mthough,LA,SLA,leaf_water,dry_matter,Carea,Narea]
+functional_traits = [thick,mthough,LTA,SLA,leaf_water,dry_matter,Carea,Narea]
