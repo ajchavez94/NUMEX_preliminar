@@ -36,7 +36,7 @@ library(patchwork)
 ```{r Data}
 getwd()
 
-#data_for_R <- read_excel('data_for_R.xlsx')
+data_for_R <- read_excel('data_for_R.xlsx')
 
 data = data_for_R
 ```
@@ -264,7 +264,7 @@ datos_Pouteria_filtered <- datos_Pouteria[datos_Pouteria$`iWUE (μmol/mol)` < 10
 anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Pouteria_filtered)#keep all the rest
 anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Pouteria)
 anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Pouteria)
-anova_model_CN <- aov(`C:N` ~ N * P, data = datos_Pouteria)
+anova_model_CN <- aov(`Narea` ~ N * P, data = datos_Pouteria) 
 
 #Diagnostico del modelo
 #par(mfrow = c(2, 2))
@@ -281,7 +281,7 @@ anova_model_15N_cr <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Clarisia)
 anova_model_18O_cr <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Clarisia)
 
 anova_model_iWUE_cr <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Clarisia)
-anova_model_CN_cr <- aov(`C:N` ~ N * P, data = datos_Clarisia)
+anova_model_CN_cr <- aov(`Narea` ~ N * P, data = datos_Clarisia)
 
 ## Para la Clarisia,, no hay ninguna diferencia en iWUE. En 18O, un poco efecto de N pero hubieron muy pocas muestras para adelantar conclusiones. En N, incrementa 18O. Transpira mas.In this case N has an effect on 15N for Clarisia.Lower 15N values in the N group.
 
@@ -312,7 +312,7 @@ datos_al <- datos_al[!is.nan(datos_al$`δ18O in ‰ vs DeltaSMOW`), ]
 anova_model_15N_al <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_al)
 anova_model_18O_al<- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_al)
 anova_model_iWUE_al <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_al)
-anova_model_CN_al <- aov(`C:N` ~ N * P, data = datos_al)
+anova_model_CN_al <- aov(`Narea` ~ N * P, data = datos_al)
 
 datos_myrcia <- data %>%
 filter(data$name == "Myrcia sp nov")
@@ -334,7 +334,7 @@ datos_myrcia <- datos_myrcia[!is.nan(datos_myrcia$`δ18O in ‰ vs DeltaSMOW`), 
 anova_model_15N_m <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_myrcia)
 anova_model_18O_m <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_myrcia)
 anova_model_iWUE_m <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_myrcia)
-anova_model_CN_m <- aov(`C:N` ~ N * P, data = datos_myrcia)
+anova_model_CN_m <- aov(`Narea` ~ N * P, data = datos_myrcia)
 
 ```
 ### ANOVA 3000
@@ -355,7 +355,7 @@ anova_model_15N_Wl<- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Weinmania)
 anova_model_18O_Wl <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Weinmania)
 
 anova_model_iWUE_Wl <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Weinmania)
-anova_model_CN_Wl <- aov(`C:N` ~ N * P, data = datos_Weinmania)
+anova_model_CN_Wl <- aov(`Narea` ~ N * P, data = datos_Weinmania)
 
 ### Hedyosmum purpurascens ####
 
@@ -367,7 +367,7 @@ anova_model_15N_Hp <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Hp)
 anova_model_18O_Hp <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Hp)
 
 anova_model_iWUE_Hp <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Hp)
-anova_model_CN_Hp <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Hp)
+anova_model_CN_Hp <- aov(`Narea` ~ N * P, data = datos_Hp)
 
 #Hedyosmum, no significant effect of any nutrient on these ecophysiological parameters. 
 ```
@@ -553,7 +553,7 @@ kable(tab_t)
 ```
 The interaction is only relevant for one species. The Pouteris and Myrcia N15.
 
-## MODELOS CON INTERACCION
+## MODELOS CON DUMMY BLOQUE E INTERACCION
 ```{r modelos DUMMY Y BLOQUE}
 
 mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque), data = datos_Pouteria)
@@ -692,7 +692,7 @@ kable(tab_t)
 
 ```
 Modelo mejora con la interaccion. Mira AIC.
-#### GRAFICOS MODELOS INTERACCION
+## MODELOS CON SUB
 ```{r SUB}
 
 library("sjPlot")
@@ -834,6 +834,53 @@ tab_t <- tab_t[-1, ]  # quitar fila original de nombres
 kable(tab_t)
 
 ```
+```{r}
+library(ggplot2)
+library(broom.mixed)
+library(dplyr)
+
+coefs <- tidy(
+  mod_N_cr,
+  effects = "fixed",
+  conf.int = TRUE,
+  conf.level = 0.95
+) %>%
+  filter(term != "(Intercept)")
+
+coefs <- coefs %>%
+  mutate(
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE            ~ ""
+    )
+  )
+
+ggplot(coefs, aes(x = term, y = estimate)) +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high),
+    width = 0.15
+  ) +
+  geom_text(
+    aes(label = sig, y = conf.high),
+    vjust = -0.6,
+    size = 5)+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  labs(
+    x = "Sub",
+    y = "Estimate (± 95% CI)"
+  ) +
+  theme_bw()
+
+coefs$term <- gsub("^Sub", "", coefs$term)
+
+#library(dotwhisker)
+#dwplot(mod_iWUE_pt, conf.level = 0.95) +
+#  theme_bw()
+```
+
 
 ```{r}
 plot_model(mod_iWUE_pt, title="Pouteria torta", axis.title="Coefficient", show.values = TRUE, value.offset = .3)

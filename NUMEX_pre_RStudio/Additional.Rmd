@@ -1,0 +1,265 @@
+---
+title: "Additional info"
+author: "Andrea"
+date: "25/2/2026"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+```{r 13C/18O}
+library(ggplot2)
+
+ggplot(data, aes(x = `δ18O in ‰ vs DeltaSMOW`, 
+                 y = `δ13C (‰ v.s.V-PDB)`,colour = Sub)) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~ name, ncol = 3) +
+  theme_bw() +
+  labs(
+    x = expression(delta^{18}*O),
+    y = expression(delta^{13}*C),
+    title = "Relationship between δ13C and δ18O per species"
+  )
+
+
+```
+```{r histograms}
+
+species_vector <- c(
+  "Pouteria torta",
+  "Alchornea lojaensis",
+  "Weinmania  loxensis",
+  "Clarisia  racemosa",
+  "Myrcia sp nov",
+  "Hedyosmun  purpurascens"
+) 
+plot_6_species_histograms <- function(data, species_vector, var_name = "iWUE") {
+  
+  # set grid: 2 rows × 3 columns
+  par(mfrow = c(2, 3))
+  
+  for (sp in species_vector) {
+    df <- subset(data, name == sp)
+    
+    # check if variable exists
+    
+    x <- df[[var_name]]
+    
+    # if no data
+    if (length(x) == 0 || !is.numeric(x)) {
+      plot.new()
+      title(main = paste("No data for:", sp))
+      next
+    }
+    
+    hist(x,
+         main = paste("Histogram:", sp),
+         xlab = var_name)
+  }
+}
+plot_6_species_histograms(data, species_vector, var_name = "iWUE (μmol/mol)") #add the different variables here.
+
+
+```
+`
+
+### ANOVA 1000
+
+```{r 1000 m}
+
+### Bombuscaro ####
+# Pouteria for isotopes results ##
+# other suggested model 
+datos_Pouteria <- data %>%
+filter(data$genus == "Pouteria")
+
+datos_Pouteria_filtered <- datos_Pouteria[datos_Pouteria$`iWUE (μmol/mol)` < 100, ]
+
+anova_model_iWUE <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Pouteria_filtered)#keep all the rest
+anova_model_18O <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Pouteria)
+anova_model_15N <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Pouteria)
+anova_model_CN <- aov(`Narea` ~ N * P, data = datos_Pouteria) 
+
+#Diagnostico del modelo
+#par(mfrow = c(2, 2))
+#plot(anova_model_iWUE)
+#par(mfrow = c(1, 1))
+
+#### Bombuscaro ####
+### Clarisia ####
+datos_Clarisia <- data %>%
+filter(data$genus == "Clarisia")
+
+anova_model_15N_cr <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_Clarisia)
+
+anova_model_18O_cr <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_Clarisia)
+
+anova_model_iWUE_cr <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_Clarisia)
+anova_model_CN_cr <- aov(`Narea` ~ N * P, data = datos_Clarisia)
+
+## Para la Clarisia,, no hay ninguna diferencia en iWUE. En 18O, un poco efecto de N pero hubieron muy pocas muestras para adelantar conclusiones. En N, incrementa 18O. Transpira mas.In this case N has an effect on 15N for Clarisia.Lower 15N values in the N group.
+
+
+```
+.
+
+```{r anova 2000m}
+
+##### San Francisco #######
+## Alchornea ###
+datos_al <- data %>%
+filter(data$name == "Alchornea lojaensis")
+
+datos_al<- datos_al%>% #the blocks change because there is a difference between.
+  mutate(
+    Bloque = case_when(
+      Plot %in% 1:4   ~ 1,
+      Plot %in% 6:9   ~ 2,
+      Plot %in% 11:14  ~ 3,
+      Plot %in% 16:19 ~ 4,
+      TRUE ~ NA_real_
+    )
+  )
+
+datos_al <- datos_al[!is.nan(datos_al$`δ18O in ‰ vs DeltaSMOW`), ]
+
+
+anova_model_15N_al <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_al)
+anova_model_18O_al<- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_al)
+anova_model_iWUE_al <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_al)
+anova_model_CN_al <- aov(`Narea` ~ N * P, data = datos_al)
+
+datos_myrcia <- data %>%
+filter(data$name == "Myrcia sp nov")
+
+#datos_myrcia<- datos_myrcia %>%
+#  mutate(
+#    Bloque = case_when(
+#      Plot %in% 1:4   ~ 1,
+#      Plot %in% 6:9   ~ 2,
+#      Plot %in% 11:14  ~ 3,
+#      Plot %in% 16:19 ~ 4,
+#      TRUE ~ NA_real_
+#    )
+#  )
+
+datos_myrcia <- datos_myrcia[!is.nan(datos_myrcia$`δ18O in ‰ vs DeltaSMOW`), ]
+
+
+anova_model_15N_m <- aov(`δ15N (‰ v.s.AIR)` ~ N * P, data = datos_myrcia)
+anova_model_18O_m <- aov(`δ18O in ‰ vs DeltaSMOW` ~ N * P, data = datos_myrcia)
+anova_model_iWUE_m <- aov(`iWUE (μmol/mol)` ~ N * P, data = datos_myrcia)
+anova_model_CN_m <- aov(`Narea` ~ N * P, data = datos_myrcia)
+
+```
+
+
+#### TABLA ANOVA 1000
+```{r TABLAS ANOVA 1000 }
+
+mods_1000 <- list(
+  "Pouteria iWUE" = anova_model_iWUE,
+  "δ18O" = anova_model_18O,
+  "δ15N" = anova_model_15N,
+  "C:N"  = anova_model_CN,
+  "Clarisia iWUE " = anova_model_iWUE_cr,
+  "δ18O" = anova_model_18O_cr,
+  "δ15N" = anova_model_15N_cr,
+  "C:N"  = anova_model_CN_cr
+)
+
+modelsummary(
+  mods_1000,
+  statistic = "({statistic}, p = {p.value})",
+  stars = c('*' = .05, '**' = .01, '***' = .001),
+  fmt = 2,
+  output = "markdown",
+  title = "ANOVA results for *1000 species*")
+```
+
+
+Pouteria: 
+iWUE relevant NxP
+d18O N, P, no the interaction
+d15N .
+C:N only with P.
+
+Clarisia:
+d18I for N,
+d15N for N
+C:N for N
+Clarisia N is important.
+
+#### TABLA ANOVA 2000
+```{r TABLAS ANOVA 2000}
+
+mods_2000 <- list(
+  "Alchornea iWUE" = anova_model_iWUE_al,
+  "δ18O" = anova_model_18O_al,
+  "δ15N" = anova_model_15N_al,
+  "C:N"  = anova_model_CN_al,
+  "Myrcia iWUE " = anova_model_iWUE_m,
+  "δ18O" = anova_model_18O_m,
+  "δ15N" = anova_model_15N_m,
+  "C:N"  = anova_model_CN_m
+)
+modelsummary(
+  mods_2000,
+  statistic = "({statistic}, p = {p.value})",
+  stars = c('*' = .05, '**' = .01, '***' = .001),
+  fmt = 2,
+  output = "markdown",
+  title = "ANOVA results for 2000 species*")
+
+```
+
+Alchornea or Myrcia. ## HELP error with a database
+C:N influenced by N (p=0.018)
+
+#### TABLA ANOVA 3000
+
+```{r TABLAS ANOVA 3000}
+
+mods_3000 <- list(
+  "Weinmannia – iWUE" = anova_model_iWUE_Wl,
+  "Weinmannia – δ18O" = anova_model_18O_Wl,
+  "Weinmannia – δ15N" = anova_model_15N_Wl,
+  "Weinmannia – C:N"  = anova_model_CN_Wl,
+  "Hedyosmum – iWUE"  = anova_model_iWUE_Hp,
+  "Hedyosmum – δ18O"  = anova_model_18O_Hp,
+  "Hedyosmum – δ15N"  = anova_model_15N_Hp,
+  "Hedyosmum – C:N"   = anova_model_CN_Hp
+)
+
+
+modelsummary(
+  mods_3000,
+  statistic = "({statistic}, p = {p.value})",
+  stars = c('*' = .05, '**' = .01, '***' = .001),
+  fmt = 2,
+  output = "markdown",
+  title = "ANOVA results for *3000 species*")
+  
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

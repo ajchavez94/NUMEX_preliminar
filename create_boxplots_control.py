@@ -108,16 +108,17 @@ def create_boxplots_control(var, data):
 
         # Italic species name
         formatted_name = sp.replace(' ', '.') # e.g.
-        ax.set_title(f"$\\it{{{formatted_name}}}$", fontsize=10)
+        ax.set_title(f"$\\it{{{formatted_name}}}$", fontsize=7, loc= "left")
 
         # Elevation box
         elev = subdf["altitud"].iloc[0]
         ax.text(
-            0.95, 0.95, f"{elev} m",
+            0.95, 1.05, f"{elev} m",
             transform=ax.transAxes,
             ha="right", va="top",
             fontsize=10,
-            bbox=dict(facecolor="white", edgecolor="black")
+            bbox=dict(facecolor="white", edgecolor="black"),
+            clip_on=False                    # IMPORTANT: allow drawing outside axes
         )
 
         ax.set_xlabel("")
