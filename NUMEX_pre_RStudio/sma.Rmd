@@ -1,0 +1,125 @@
+---
+title: "SMA"
+author: "Andrea"
+date: "9/3/2026"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r libraries}
+library(ggpmisc)
+library(smatr)
+library(lmodel2)
+library("kableExtra")
+library("openxlsx")
+library(readxl)
+library(tidyverse)
+library(dplyr)
+
+```
+
+
+```{r Data}
+getwd()
+
+data_for_R <- read_excel('data_for_R.xlsx')
+
+data = data_for_R
+
+```
+
+```{r Data2}
+
+datos_3000 <- data%>%
+filter(data$Site == "CaNu")
+
+datos_1000 <- data%>%
+filter(data$Site == "BoN")
+
+datos_2000 <- data %>%
+filter(data$Site == "SFNu")
+
+```
+https://docs.r4photobiology.info/ggpmisc/articles/major-axis-regression.html
+
+```{r}
+library(ggplot2)
+library(ggpmisc)
+
+species_colors <- c(
+  "Pouteria torta" = "orange",
+  "Clarisia  racemosa" = "gold",
+  "Alchornea lojaensis" = "green",
+  "Myrcia sp nov" = "darkgreen",
+  "Hedyosmun  purpurascens" = "purple",
+  "Weinmania  loxensis" = "blue"
+)
+
+old_theme <- theme_set(theme_bw())
+
+ggplot(data, aes(Narea, `iWUE (μmol/mol)`, colour = name)) +
+  geom_point() +
+  stat_ma_line(method = "SMA") +
+  stat_ma_eq(
+    method = "SMA",
+    mapping = use_label("eq", "R2", "n", "P")
+  ) +
+  facet_wrap(~elevation_m, nrow = 1) +
+    scale_colour_manual(values = species_colors) +
+  labs(
+    x = "Narea",
+    y = "iWUE (μmol/mol)",
+    colour = "name"
+  ) +
+  theme(
+    strip.text = element_text(size = 12, face = "bold")
+  )
+```
+```{r SLA}
+
+species_colors <- c(
+  "Pouteria torta" = "orange",
+  "Clarisia  racemosa" = "gold",
+  "Alchornea lojaensis" = "green",
+  "Myrcia sp nov" = "darkgreen",
+  "Hedyosmun  purpurascens" = "purple",
+  "Weinmania  loxensis" = "blue"
+)
+
+old_theme <- theme_set(theme_bw())
+
+ggplot(data, aes(`Specific leaf area (cm²/g)`, `iWUE (μmol/mol)`, colour = name)) +
+  geom_point() +
+  stat_ma_line(method = "SMA") +
+  stat_ma_eq(
+    method = "SMA",
+    mapping = use_label("eq", "R2", "n", "P"),
+    label.x.npc = 0.05,       # esquina izquierda
+  label.y.npc = 0.95,       # esquina superior
+  hjust = 0,                # alinear texto a la izquierda
+  vjust = 1,                # alinear arriba
+  label.padding = unit(0.05, "lines"),  # menos espacio entre líneas
+  lineheight = 0.9          # compactar líneas
+  ) +
+  facet_wrap(~elevation_m, nrow = 1) +
+    scale_colour_manual(values = species_colors) +
+  labs(
+    x = "SLA",
+    y = "iWUE (μmol/mol)",
+    colour = "name"
+  ) +
+  theme(
+    strip.text = element_text(size = 12, face = "bold")
+  )
+```
+```
+
