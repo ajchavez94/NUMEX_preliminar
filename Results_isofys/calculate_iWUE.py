@@ -24,15 +24,16 @@ def formula_iWUE(iWUE,delt13Cair,Cair):
   return iWUE_clean
    
 def calculate_iWUE(iWUE,CO2):
-    """ This script calculates iWUE from a given database. Only ask which source of CO2 we want to use"""
-     #HELP: Once I have the results then maybe correct. Samuel
+    """ This script calculates iWUE from a given database. Only ask which source of CO2 we want to use.
+    Marijn advice: Use CO2 observation from Manu Lloa and delta13C from site"""
+     #HELP: Once I have the results then maybe correct. 
 
  #Ask the user if we want Manu Lloa, if yes = 1, if No, observation = 0, 
     if CO2 == "on_site":
         # ---- on_site code ----
         print("You choose on site")
-        delt13Cair = -9.420643812691782
-        Cair = 458.9521799015872  #data mean for Ecuador samples
+        delt13Cair = -13.56 #9.22 ### data from Observations in the North. The values collected are too high.. Probar con 13.56
+        Cair = 423.1142299   #data mean for Ecuador samples 458.9521799015872 but I am using the one for Manu Lloa and delta13 from mean observations.
         # data for 2024 Napo mean is 458. Why is it so high?
         iWUE = formula_iWUE(iWUE,delt13Cair,Cair)
         print("iWUE añadida")

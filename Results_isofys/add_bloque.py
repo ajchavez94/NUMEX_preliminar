@@ -4,6 +4,8 @@ def add_info_bloque(df):
 
    # Rule for Site == "SFNU"
    mask_sfnu = df["Site"] == "SFNU"
+   df["Plot"].astype("int64")
+   
    df.loc[mask_sfnu & df["Plot"].between(1, 4),  "Bloque"] = 1
    df.loc[mask_sfnu & df["Plot"].between(6, 9),  "Bloque"] = 2
    df.loc[mask_sfnu & df["Plot"].between(11, 14), "Bloque"] = 3

@@ -34,4 +34,4 @@ CN_ratio = "C:N"
 CP_ratio = "C:P"
 NP_ratio = "N:P"
 
-functional_traits = [thick,mthough,LTA,SLA,leaf_water,dry_matter,Carea,Narea]
+functional_traits = [thick,mthough,LA,SLA,leaf_water,dry_matter,Carea,Narea]

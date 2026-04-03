@@ -666,6 +666,34 @@ for (nm in names(models_iWUE_d)) {
 dev.off()
 
 ```
+```{r test}
+
+mod_iwue_narea_pt = lmer(`iWUE (μmol/mol)`~ Narea+N+P +(1|Bloque), data = datos_Pouteria)
+mod_iwue_narea_cr= lmer(`iWUE (μmol/mol)`~ Narea+N+P +(1|Bloque), data = datos_Clarisia)
+mod_iwue_narea_al= lmer(`iWUE (μmol/mol)`~ Narea+N+P +(1|Bloque), data = datos_al)
+mod_iwue_narea_my= lmer(`iWUE (μmol/mol)`~ Narea+N+P +(1|Bloque), data = datos_myrcia)
+mod_iwue_narea_hp= lmer(`iWUE (μmol/mol)`~ Narea+N+P +(1|Bloque), data = datos_hp)
+mod_iwue_narea_we= lmer(`iWUE (μmol/mol)`~ Narea+N+P +(1|Bloque), data = datos_Weinmania)
+
+imod_iwue_narea_pt = lmer(`iWUE (μmol/mol)`~ Narea*N*P +(1|Bloque), data = datos_Pouteria)
+imod_iwue_narea_cr= lmer(`iWUE (μmol/mol)`~ Narea*N*P +(1|Bloque), data = datos_Clarisia)
+imod_iwue_narea_al= lmer(`iWUE (μmol/mol)`~ Narea*N*P +(1|Bloque), data = datos_al)
+imod_iwue_narea_my= lmer(`iWUE (μmol/mol)`~ Narea*N*P +(1|Bloque), data = datos_myrcia)
+imod_iwue_narea_hp= lmer(`iWUE (μmol/mol)`~ Narea*N*P +(1|Bloque), data = datos_hp)
+imod_iwue_narea_we= lmer(`iWUE (μmol/mol)`~ Narea*N*P +(1|Bloque), data = datos_Weinmania)
+summary(mod_iwue_narea_pt)
+summary(mod_iwue_narea_cr)
+summary(mod_iwue_narea_al)
+summary(mod_iwue_narea_my)
+summary(mod_iwue_narea_hp)
+summary(mod_iwue_narea_we)
+summary(imod_iwue_narea_pt)
+summary(imod_iwue_narea_cr)
+summary(imod_iwue_narea_al)
+summary(imod_iwue_narea_my)
+summary(imod_iwue_narea_hp)
+summary(imod_iwue_narea_we)
+
 
 ```{r DHARMA diagnostics}
 # Run and plot
