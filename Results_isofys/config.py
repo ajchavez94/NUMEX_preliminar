@@ -20,6 +20,7 @@ leaf_water = "leaf water content"
 dry_matter = "dry matter content (mg/g)"
 leaf_dry = "Leaf dry weight (g)"
 leaf_fresh = "Leaf fresh weight (g)"
+iWUE = "iWUE (μmol/mol)"
 
 ### for nutrients ##
 Carea = "C_area" #Nleaf_C/SLA

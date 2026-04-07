@@ -7,6 +7,8 @@ named13C_cellulose = "δ13C (‰ v.s.V-PDB)"
 named13C_bulk = "bulk_δ13C (‰ v.s.V-PDB)"
 name18O = "δ18O in ‰ vs DeltaSMOW"
 named15N = "δ15N (‰ v.s.AIR)"
+
+iWUE = "iWUE (μmol/mol)"
 leaf_C ="[C_b]"
 leaf_N = "[N]"
 nameC_cellulose = "[C]"

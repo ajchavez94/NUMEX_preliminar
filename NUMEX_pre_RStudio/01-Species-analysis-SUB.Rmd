@@ -1,7 +1,7 @@
 ---
 title: "Analisis per specie MODEL SUB"
 author: "Andrea Chavez"
-date: "25-02-2026"
+date: "03-04-2026"
 output: html_document
 ---
 
@@ -14,6 +14,7 @@ Here are the analysis at species level.
 
 
 ```{r libraries}
+library(dplyr)
 library(tidyverse)
 library(glmmTMB)
 library(DHARMa)
@@ -22,7 +23,6 @@ library(scico)
 library(lmerTest)
 library(lme4)
 library(tables)
-library(dplyr)
 library(flextable)
 library(readxl)
 library(modelsummary)
@@ -37,25 +37,21 @@ getwd()
 
 data_for_R <- read_excel('data_for_R.xlsx')
 
-data_1 = data_for_R
+data= data_for_R
 ```
 
 ```{r transformando columnas}
 
-# Crear columnas binarias manualmente para añadir fertilizacion
-#columnas binarias
-
-data_1$Nmass <- (data_1$`[N]`)*1000 #HELP REVISAR EL ORIGINAL. ORINGIAL NO ESTA EN PORCENTAJE. ENTONCEX HACE FALTA MULTIPLICAR PÖR 100 y luego por 10 para llegar mg por g
-data_1$Cmass <- (data_1$`[C_b]`)*1000 #HELP REVISAR EL ORIGINAL. ORINGIAL NO ESTA EN PORCENTAJE. ENTONCEX HACE FALTA MULTIPLICAR PÖR 100 y luego 
-data_1$Carea <- (((data_1$`[C_b]`)*1000)/data_1$`Specific leaf area (cm²/g)`)*10 #g/m2
-#por 10 para llegar mg por g
-
-data_1$logNmass <- log(data_1$Nmass) #no el porcentaje
+### nutrientes para ver cual funciona mejor.
+data$logNmass <- log(data$LNC) #
+data$logCmass <- log(data$LCC) #
+data$logPmass <- log(data$LPC) #
 
 
-data_1$SUB = data_1$Sub
-data <- data_1%>%
-  dplyr::select(
+data$SUB = data$Sub #porque abajo esta en mayuscula
+
+#solo dejar las necesarias
+data <- dplyr::select(data,
         `name`,
         `genus`,
         `SUB`,#
@@ -67,16 +63,9 @@ data <- data_1%>%
     `δ18O in ‰ vs DeltaSMOW`,
     `Specific leaf area (cm²/g)`,
     `δ13C (‰ v.s.V-PDB)`,
-    Narea,
-    `Nmass`,
-    logNmass,
-    Carea,
-    Cmass,
     `force to punch (kN/m)`,
     `thickness (mm)`,
-    Ci
-    
-  )
+    Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area)
 ```
 
 
@@ -101,7 +90,112 @@ species_order <- c(
 data$name <- factor(data$name, levels = species_order)
 
 # Elevation map
+```
+# Funciones to be used
+## GRAPH
+```{r funcion para graficar}
+plot_coefs <- function(model, title, color = "black") {
 
+  coefs <- broom.mixed::tidy(
+    model,
+    effects = "fixed",
+    conf.int = TRUE,
+    conf.level = 0.95
+  ) %>%
+    dplyr::filter(term != "(Intercept)") %>%
+    dplyr::mutate(
+      term = gsub("^Sub", "", term),
+      sig = dplyr::case_when(
+        p.value < 0.001 ~ "***",
+        p.value < 0.01  ~ "**",
+        p.value < 0.05  ~ "*",
+        TRUE            ~ ""
+      )
+    )
+
+  ggplot2::ggplot(coefs, ggplot2::aes(x = term, y = estimate)) +
+    ggplot2::geom_point(size = 3, color = color) +
+    ggplot2::geom_errorbar(
+      ggplot2::aes(ymin = conf.low, ymax = conf.high),
+      width = 0.15,
+      color = color
+    ) +
+    ggplot2::geom_text(
+      ggplot2::aes(
+        label = sig,
+        y = conf.high + 0.05 * max(abs(coefs$estimate))
+      ),
+      vjust = -0.6,
+      size = 5,
+      color = color
+    ) +
+    ggplot2::geom_hline(
+      yintercept = 0,
+      linetype = "dashed",
+      color = "grey40"
+    ) +
+    ggplot2::labs(
+      title = title,
+      x = "",
+      y = "Estimate (± 95% CI)"
+    ) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.2))) +
+    ggplot2::coord_cartesian(clip = "off") +
+    ggplot2::theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+}
+```
+
+```{r tabla}
+
+tabla <- function(model_list) {
+
+  tab <- modelsummary(
+    model_list,
+    output = "data.frame",
+    statistics = TRUE,
+    stars = TRUE,
+    gof_map = c("nobs", "r2.marginal", "r2.conditional", "aic")
+  )
+
+  # Transponer
+  tab_t <- as.data.frame(t(tab))
+
+  # Usar primera fila como nombres
+  colnames(tab_t) <- as.character(tab_t[1, ])
+
+  # Hacer nombres únicos 
+  colnames(tab_t) <- make.unique(colnames(tab_t))
+
+  # Eliminar fila usada como header
+  tab_t <- tab_t[-1, , drop = FALSE]
+
+  # Guardar nombres de modelo
+  tab_t$Modelo <- rownames(tab_t)
+  rownames(tab_t) <- NULL
+
+  # Reordenar columnas
+  tab_t <- tab_t[, c("Modelo", setdiff(names(tab_t), "Modelo")), drop = FALSE]
+
+  # Exportar a Excel
+  # 👉 Capturar nombre del objeto
+  nombre_modelo <- deparse(substitute(model_list))
+  file_name <- paste0(nombre_modelo, ".xlsx")
+  
+  write.xlsx(tab_t, file_name, overwrite = TRUE, asTable = TRUE)
+
+  message("✔ Model saved on excel")
+
+  # Retornar tabla para markdown / PDF / HTML
+  return(kbl(tab_t, booktabs = TRUE, align = "l"))
+}
+
+``` 
+
+# 1. ISOTOPOS
+
+```{r Modelos sin interaccion }
 datos_Pouteria <- data %>%
 filter(data$genus == "Pouteria")
 datos_Clarisia <- data %>%
@@ -115,141 +209,54 @@ filter(data$genus == "Hedyosmun")
 datos_Weinmania <- data %>%
 filter(data$genus == "Weinmania")
 
-##### Pouteria ########
-mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_Pouteria)
-mod_O18_pt <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ SUB + (1 | Bloque), data = datos_Pouteria)
+## IWUE
+
+mod_iWUE_pt <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Pouteria)# is Singular (1 | Bloque)
+mod_iWUE_cr <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Clarisia)#is Singular
+mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_al)
+mod_iWUE_my <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_myrcia)#isSingular
+mod_iWUE_hp <- lm(`iWUE (μmol/mol)` ~SUB, data = datos_hp) #isSingular
+mod_iWUE_wl <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_Weinmania)
+
+summary(mod_iWUE_pt)
+summary(mod_iWUE_cr)
+summary(mod_iWUE_al)
+summary(mod_iWUE_my)
+summary(mod_iWUE_hp)
+summary(mod_iWUE_wl)
+
+
+### C13 
 mod_C13_pt <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_Pouteria)
+mod_C13_cr <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_Clarisia)
+mod_C13_al <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_al)
+mod_C13_my <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_myrcia)
+mod_C13_hp <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_hp)
+mod_C13_wl <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_Weinmania)
+
+summary(mod_C13_pt)
+summary(mod_C13_cr)
+summary(mod_C13_al)
+summary(mod_C13_my)
+summary(mod_C13_hp)
+summary(mod_C13_wl)
+
+
 mod_Ci_pt <- lmer(Ci ~ SUB + (1 | Bloque), data = datos_Pouteria)
 
 #mod_N15_pt <- lmer(`δ15N (‰ v.s.AIR)` ~ SUB + (1 | Bloque), data = datos_Pouteria)
 #mod_CN_pt <- lmer(`C:N` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-
-###### CLARISIA """"""""#########
-mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_Clarisia)
-mod_O18_cr<- lmer(`δ18O in ‰ vs DeltaSMOW` ~SUB  + (1 | Bloque), data = datos_Clarisia)
-mod_C13_cr <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_Clarisia)
+#mod_O18_cr<- lmer(`δ18O in ‰ vs DeltaSMOW` ~SUB  + (1 | Bloque), data = datos_Clarisia)
 mod_Ci_cr <- lmer(Ci ~ SUB + (1 | Bloque), data = datos_Clarisia)
-
-#mod_N15_cr<- lmer(`δ15N (‰ v.s.AIR)` ~ SUB + (1 | Bloque), data = datos_Clarisia)
-#mod_CN_cr<- lmer(`C:N` ~SUB+ (1 | Bloque), data = datos_Clarisia)
-
-
-##### Alchornea ===============
-mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_al)
-mod_O18_al<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ SUB + (1 | Bloque), data = datos_al)
-mod_C13_al <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_al)
 mod_Ci_al <- lmer(Ci ~ SUB + (1 | Bloque), data = datos_al)
-
-#mod_N15_al<- lmer(`δ15N (‰ v.s.AIR)` ~ SUB+  (1 | Bloque), data = datos_al)
-#mod_CN_al<- lmer(`C:N` ~SUB + (1 | Bloque), data = datos_al)
-
-
-##########################
-mod_iWUE_my <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_myrcia)
-mod_O18_my<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_C13_my <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_myrcia)
 mod_Ci_my <- lmer(Ci~ SUB + (1 | Bloque), data = datos_myrcia)
-
-#mod_N15_my<- lmer(`δ15N (‰ v.s.AIR)` ~SUB+ (1 | Bloque), data = datos_myrcia)
-#mod_CN_my<- lmer(`C:N` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-
-
-################ Hedyosmum 
-mod_iWUE_hp <- lmer(`iWUE (μmol/mol)` ~SUB+ (1 | Bloque), data = datos_hp)
-mod_O18_hp<- lmer(`δ18O in ‰ vs DeltaSMOW` ~SUB+  (1 | Bloque), data = datos_hp)
-mod_C13_hp <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_hp)
 mod_Ci_hp <- lmer(Ci~ SUB + (1 | Bloque), data = datos_hp)
-
-#mod_N15_hp<- lmer(`δ15N (‰ v.s.AIR)` ~ SUB+(1 | Bloque), data = datos_Hp)
-#mod_CN_hp<- lmer(`C:N` ~ SUB + (1 | Bloque), data = datos_Hp)
-
-
-############# Weinmania
-mod_iWUE_wl <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_Weinmania)
-mod_O18_wl<- lmer(`δ18O in ‰ vs DeltaSMOW` ~ SUB + (1 | Bloque), data = datos_Weinmania)
-mod_C13_wl <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_Weinmania)
 mod_Ci_wl <- lmer(Ci ~ SUB + (1 | Bloque), data = datos_Weinmania)
-
-#mod_N15_wl<- lmer(`δ15N (‰ v.s.AIR)` ~ SUB + (1 | Bloque), data = datos_Weinmania)
-#mod_CN_wl<- lmer(`C:N` ~ N + P + (1 | Bloque), data = datos_Weinmania)
 ```
+```{r listado}
+#source("tabla_SUB.R")
 
-## DUMMIES ESTEQIEO
-```{r modelos DUMMY Y BLOQUE ESTEOQUEMETRIA}
-
-
-#POUTYERA
-mod_Narea_pt <- lmer(`Narea` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-mod_Nmass_pt <- lmer(`Nmass` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-mod_logNmass_pt <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-
-mod_Narea_cr <- lmer(`Narea` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
-mod_Nmass_cr <- lmer(Nmass ~ SUB+ (1 | Bloque), data = datos_Clarisia)
-mod_logNmass_cr <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
-
-
-mod_Narea_my <- lmer(`Narea` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_Nmass_my <- lmer(Nmass ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_logNmass_my <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_Narea_al <- lmer(`Narea` ~ SUB+ (1 | Bloque), data = datos_al)
-mod_Nmass_al <- lmer(Nmass ~ SUB+ (1 | Bloque), data = datos_al)
-mod_logNmass_al <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_al)
-
-mod_Narea_wl <- lmer(`Narea` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
-mod_Nmass_wl <- lmer(Nmass ~ SUB+ (1 | Bloque), data = datos_Weinmania)
-mod_logNmass_wl <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
-
-mod_Narea_hp <- lmer(`Narea` ~ SUB+ (1 | Bloque), data = datos_hp)
-mod_Nmass_hp <- lmer(Nmass ~ SUB+ (1 | Bloque), data = datos_hp)
-mod_logNmass_hp <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_hp)
-
-# Cmass
-mod_Cmass_pt <- lmer(Cmass ~ SUB + (1 | Bloque), data = datos_Pouteria)
-mod_Cmass_cr <- lmer(Cmass ~ SUB + (1 | Bloque), data = datos_Clarisia)
-mod_Cmass_al <- lmer(Cmass ~ SUB + (1 | Bloque), data = datos_al)
-mod_Cmass_my <- lmer(Cmass ~ SUB + (1 | Bloque), data = datos_myrcia)
-mod_Cmass_hp <- lmer(Cmass ~ SUB + (1 | Bloque), data = datos_hp)
-mod_Cmass_wl <- lmer(Cmass ~ SUB + (1 | Bloque), data = datos_Weinmania)
-
-# Carea
-mod_Carea_pt <- lmer(Carea ~ SUB + (1 | Bloque), data = datos_Pouteria)
-mod_Carea_cr <- lmer(Carea ~ SUB + (1 | Bloque), data = datos_Clarisia)
-mod_Carea_al <- lmer(Carea ~ SUB + (1 | Bloque), data = datos_al)
-mod_Carea_my <- lmer(Carea ~ SUB + (1 | Bloque), data = datos_myrcia)
-mod_Carea_hp <- lmer(Carea ~ SUB + (1 | Bloque), data = datos_hp)
-mod_Carea_wl <- lmer(Carea ~ SUB + (1 | Bloque), data = datos_Weinmania)
-
-```
-### DUMMIES MORPHO
-
-```{r DUMMIES morpho}
-mod_SLA_pt <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-mod_SLA_cr <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
-mod_SLA_al <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_al)
-mod_SLA_my <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_SLA_hp <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_hp)
-mod_SLA_wl <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
-
-mod_Thick_pt <- lmer( `thickness (mm)`~ SUB+ (1 | Bloque), data = datos_Pouteria)
-mod_Thick_cr <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
-mod_Thick_al <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_al)
-mod_Thick_my <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_Thick_hp <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_hp)
-mod_Thick_wl <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
-
-mod_Tough_pt <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-mod_Tough_cr <- lmer(`force to punch (kN/m)`~ SUB+ (1 | Bloque), data = datos_Clarisia)
-mod_Tough_al <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_al)
-mod_Tough_my <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_Tough_hp <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_hp)
-mod_Tough_wl <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
-
-```
-
-## LISTA DE MODELOS DUMMIES
-```{r modelsD}
-
-models_iWUE_d <- list(
+models_iWUE<- list(
 
 # iWUE
 "iWUE | 1000 | Pouteria" = mod_iWUE_pt,
@@ -274,9 +281,100 @@ models_iWUE_d <- list(
 "Ci | 2000 | Myrcia" = mod_Ci_my,
 "Ci | 3000 | Hedyosmum" = mod_Ci_hp,
 "Ci | 3000 | Weinmannia" = mod_Ci_wl)
+```
+## 1.1. Tabla
+```{r tabla 1}
+tabla(models_iWUE)
+```
 
-models_estq_d <- list(
+## 1.2. Diagnostico
+```{r Diagnostico modelos isotopos}
+par(mfrow = c(2, 2))  # 4 modelos por página
 
+for (name in names(models_iWUE)) {
+  m <- models_iWUE[[name]]
+  r <- resid(m)
+  f <- fitted(m)
+  
+  # 1. Residuales vs Fitted
+  plot(f, r,
+       main = paste(name, "- Residuals"),
+       xlab = "Fitted values",
+       ylab = "Residuals")
+  abline(h = 0, col = "red")
+  
+  # 2. QQ plot
+  qqnorm(r, main = paste(name, "- QQ plot"))
+  qqline(r, col = "red")
+}
+```
+
+# 2. NUTRIENTES
+```{r modelos ESTEOQUEMETRIA}
+
+###### NITROGEN ############
+mod_Nmass_pt <- lmer(LNC ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_Nmass_cr <- lmer(LNC ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_Nmass_my <- lmer(LNC ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_Nmass_al <- lmer(LNC ~ SUB+ (1 | Bloque), data = datos_al)
+mod_Nmass_wl <- lmer(LNC ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+mod_Nmass_hp <- lmer(LNC ~ SUB+ (1 | Bloque), data = datos_hp)
+
+mod_logNmass_pt <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_logNmass_cr <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_logNmass_my <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_logNmass_al <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_logNmass_wl <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+mod_logNmass_hp <- lmer(`logNmass` ~ SUB+ (1 | Bloque), data = datos_hp)
+
+mod_Narea_pt <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_Narea_cr <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_Narea_my <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_Narea_wl <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+mod_Narea_al <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_Narea_hp <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_hp)
+
+######## PHOSPHORUS ############
+mod_Pmass_pt <- lmer(LPC ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_Pmass_cr <- lmer(LPC ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_Pmass_my <- lmer(LPC ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_Pmass_al <- lmer(LPC ~ SUB+ (1 | Bloque), data = datos_al)
+mod_Pmass_wl <- lmer(LPC ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+mod_Pmass_hp <- lmer(LPC ~ SUB+ (1 | Bloque), data = datos_hp)
+
+mod_logPmass_pt <- lmer(`logPmass` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_logPmass_cr <- lmer(`logPmass` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_logPmass_my <- lmer(`logPmass` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_logPmass_al <- lmer(`logPmass` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_logPmass_wl <- lmer(`logPmass` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+mod_logPmass_hp <- lmer(`logPmass` ~ SUB+ (1 | Bloque), data = datos_hp)
+
+mod_Parea_pt <- lmer(`P_area` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_Parea_cr <- lmer(`P_area` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_Parea_my <- lmer(`P_area` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_Parea_wl <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+mod_Parea_al <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_Parea_hp <- lmer(`N_area` ~ SUB+ (1 | Bloque), data = datos_hp)
+
+########## CARBON ################
+mod_Cmass_pt <- lmer(LCC ~ SUB + (1 | Bloque), data = datos_Pouteria)
+mod_Cmass_cr <- lmer(LCC ~ SUB + (1 | Bloque), data = datos_Clarisia)
+mod_Cmass_al <- lmer(LCC ~ SUB + (1 | Bloque), data = datos_al)
+mod_Cmass_my <- lmer(LCC ~ SUB + (1 | Bloque), data = datos_myrcia)
+mod_Cmass_hp <- lmer(LCC ~ SUB + (1 | Bloque), data = datos_hp)
+mod_Cmass_wl <- lmer(LCC ~ SUB + (1 | Bloque), data = datos_Weinmania)
+
+mod_Carea_pt <- lmer(C_area ~ SUB + (1 | Bloque), data = datos_Pouteria)
+mod_Carea_cr <- lmer(C_area ~ SUB + (1 | Bloque), data = datos_Clarisia)
+mod_Carea_al <- lmer(C_area ~ SUB + (1 | Bloque), data = datos_al)
+mod_Carea_my <- lmer(C_area ~ SUB + (1 | Bloque), data = datos_myrcia)
+mod_Carea_hp <- lmer(C_area ~ SUB + (1 | Bloque), data = datos_hp)
+mod_Carea_wl <- lmer(C_area ~ SUB + (1 | Bloque), data = datos_Weinmania)
+
+```
+```{r estq}
+
+models_est <- list(
 # Nmass
 "Nmass | 1000 | Pouteria" = mod_Nmass_pt,
 "Nmass | 1000 | Clarisia" = mod_Nmass_cr,
@@ -314,9 +412,82 @@ models_estq_d <- list(
 "Carea | 2000 | Alchornea" = mod_Carea_al,
 "Carea | 2000 | Myrcia" = mod_Carea_my,
 "Carea | 3000 | Hedyosmum" = mod_Carea_hp,
-"Carea | 3000 | Weinmannia" = mod_Carea_wl)
+"Carea | 3000 | Weinmannia" = mod_Carea_wl,
 
-models_leafstr_d <- list(
+# Pmass
+"LPC | 1000 | Pouteria" = mod_Pmass_pt,
+"LPC | 1000 | Clarisia" = mod_Pmass_cr,
+"LPC | 2000 | Alchornea" = mod_Pmass_al,
+"LPC | 2000 | Myrcia" = mod_Pmass_my,
+"LPC | 3000 | Hedyosmum" = mod_Pmass_hp,
+"LPC | 3000 | Weinmannia" = mod_Pmass_wl,
+
+# Carea
+"Parea | 1000 | Pouteria" = mod_Parea_pt,
+"Parea | 1000 | Clarisia" = mod_Parea_cr,
+"Parea | 2000 | Alchornea" = mod_Parea_al,
+"Parea | 2000 | Myrcia" = mod_Parea_my,
+"Parea | 3000 | Hedyosmum" = mod_Parea_hp,
+"Parea | 3000 | Weinmannia" = mod_Parea_wl)
+
+```
+## 2.1. Tabla
+```{r tabla 2}
+tabla(models_est)
+```
+
+## 2.2. Diagnostico
+```{r DIAGNOSTICO}
+par(mfrow = c(2, 2))  # 4 modelos por página
+
+for (name in names(models_est)) {
+  m <- models_est[[name]]
+  r <- resid(m)
+  f <- fitted(m)
+  
+  # 1. Residuales vs Fitted
+  plot(f, r,
+       main = paste(name, "- Residuals"),
+       xlab = "Fitted values",
+       ylab = "Residuals")
+  abline(h = 0, col = "red")
+  
+  # 2. QQ plot
+  qqnorm(r, main = paste(name, "- QQ plot"))
+  qqline(r, col = "red")
+}
+```
+
+
+#3. MORPHOLOGICAL
+
+```{r morpho}
+mod_SLA_pt <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_SLA_cr <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_SLA_al <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_SLA_my <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_SLA_hp <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_hp)
+mod_SLA_wl <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+
+mod_Thick_pt <- lmer( `thickness (mm)`~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_Thick_cr <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_Thick_al <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_Thick_my <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_Thick_hp <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_hp)
+mod_Thick_wl <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+
+mod_Tough_pt <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_Tough_cr <- lmer(`force to punch (kN/m)`~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_Tough_al <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_Tough_my <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_Tough_hp <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_hp)
+mod_Tough_wl <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+
+```
+
+```{r listado morpho}
+
+models_leaf <- list(
 
 # SLA
 "SLA | 1000 | Pouteria" = mod_SLA_pt,
@@ -343,163 +514,43 @@ models_leafstr_d <- list(
 "Toughness | 3000 | Weinmannia" = mod_Tough_wl
 )
 ```
-#### Funcion tabla
-```{r tabla}
 
-tabla <- function(model_list) {
-
-  tab <- modelsummary(
-    model_list,
-    output = "data.frame",
-    statistics = TRUE,
-    stars = TRUE,
-    gof_map = c("nobs", "r2.marginal", "r2.conditional", "aic")
-  )
-
-  # Transponer
-  tab_t <- as.data.frame(t(tab))
-
-  # Usar primera fila como nombres
-  colnames(tab_t) <- as.character(tab_t[1, ])
-
-  # Hacer nombres únicos 
-  colnames(tab_t) <- make.unique(colnames(tab_t))
-
-  # Eliminar fila usada como header
-  tab_t <- tab_t[-1, , drop = FALSE]
-
-  # Guardar nombres de modelo
-  tab_t$Modelo <- rownames(tab_t)
-  rownames(tab_t) <- NULL
-
-  # Reordenar columnas
-  tab_t <- tab_t[, c("Modelo", setdiff(names(tab_t), "Modelo")), drop = FALSE]
-
-  # Exportar a Excel
-  write.xlsx(tab_t, "model_list_SUB.xlsx", overwrite = TRUE, asTable = TRUE)
-
-  message("✔ Model saved on excel")
-
-  # Retornar tabla para markdown / PDF / HTML
-  return(kbl(tab_t, booktabs = TRUE, align = "l"))
-}
-
-tabla(models_iWUE_d)
-tabla(models_estq_d)
-tabla(models_leafstr_d)
-
-
+## 3.1 Tabla
+```{r tabla 3}
+tabla(models_leaf)
 ```
-### Funcion para graficar
 
-
+## 3.2 Diagnostico.
 ```{r}
-tabla <- function(lista_modelos) {
 
-  for(nombre in names(lista_modelos)){
+par(mfrow = c(2, 2))  # 4 modelos por página
 
-    model_list <- lista_modelos[[nombre]]
-
-    tab <- modelsummary(
-      model_list,
-      output = "data.frame",
-      statistics = TRUE,
-      stars = TRUE,
-      gof_map = c("nobs", "r2.marginal", "r2.conditional", "aic")
-    )
-
-    # Transponer
-    tab_t <- as.data.frame(t(tab))
-
-    # Usar primera fila como nombres
-    colnames(tab_t) <- as.character(tab_t[1, ])
-    colnames(tab_t) <- make.unique(colnames(tab_t))
-
-    # Eliminar header
-    tab_t <- tab_t[-1, , drop = FALSE]
-
-    # Guardar nombres de modelo
-    tab_t$Modelo <- rownames(tab_t)
-    rownames(tab_t) <- NULL
-
-    # Reordenar columnas
-    tab_t <- tab_t[, c("Modelo", setdiff(names(tab_t), "Modelo")), drop = FALSE]
-
-    # Exportar Excel
-    archivo <- paste0("modelos_", nombre, ".xlsx")
-    write.xlsx(tab_t, archivo, overwrite = TRUE, asTable = TRUE)
-
-    message(paste("✔ Excel creado:", archivo))
-  }
-
+for (name in names(models_leaf)) {
+  m <- models_leaf[[name]]
+  r <- resid(m)
+  f <- fitted(m)
+  
+  # 1. Residuales vs Fitted
+  plot(f, r,
+       main = paste(name, "- Residuals"),
+       xlab = "Fitted values",
+       ylab = "Residuals")
+  abline(h = 0, col = "red")
+  
+  # 2. QQ plot
+  qqnorm(r, main = paste(name, "- QQ plot"))
+  qqline(r, col = "red")
 }
-
-listas <- list(
-  iWUE = models_iWUE_d,
-  est = models_estq_d,
-  leafstr = models_leafstr_d)
-
-tabla(listas)
 ```
-
+## 4. GRAFICOS
 ```{r GGPLOT }
-library(broom.mixed)
-library(dplyr)
-library(ggplot2)
 
-plot_coefs <- function(model, title, control = "C") {
-
-  coefs <- tidy(
-    model,
-    effects = "fixed",
-    conf.int = TRUE,
-    conf.level = 0.95
-  ) %>%
-    filter(term != "(Intercept)") %>%
-    mutate(
-      term = gsub("^Sub", "", term),
-      sig = case_when(
-        p.value < 0.001 ~ "***",
-        p.value < 0.01  ~ "**",
-        p.value < 0.05  ~ "*",
-        TRUE            ~ ""
-      )
-    )
-
-  # 👉 Agregar explícitamente el control
-  control_row <- tibble(
-    term = control,
-    estimate = 0,
-    conf.low = 0,
-    conf.high = 0,
-    sig = ""
-  )
-
-  coefs <- bind_rows(control_row, coefs)
-
-  ggplot(coefs, aes(x = term, y = estimate)) +
-    geom_point(size = 3, color = "black") +
-    geom_errorbar(
-      aes(ymin = conf.low, ymax = conf.high),
-      width = 0.15
-    ) +
-    geom_text(
-      aes(label = sig, y = conf.high+0.05 * max(abs(coefs$estimate))),
-      vjust = -0.6,
-      size = 5
-    ) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
-    labs(
-      title = title,
-      x = "",
-      y = "Estimate (± 95% CI)"
-    ) +
-   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2)))+
-    coord_cartesian(clip = "off") +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
-}
+p1_iWUE <- plot_coefs(mod_iWUE_pt, "P. torta",color="#E69F00")
+p2_iWUE <- plot_coefs(mod_iWUE_cr, "C. racemosa")
+p3_iWUE <- plot_coefs(mod_iWUE_my, "M. sp")
+p4_iWUE <- plot_coefs(mod_iWUE_al, "A. lojaensis")
+p5_iWUE <- plot_coefs(mod_iWUE_hp, "H. purpurascens")
+p6_iWUE <- plot_coefs(mod_iWUE_wl, "W. loxensis")
 
 p1_Narea <- plot_coefs(mod_Narea_pt, "P.torta")
 p2_Narea <- plot_coefs(mod_Narea_cr, "C. racemosa")
@@ -508,19 +559,12 @@ p4_Narea <- plot_coefs(mod_Narea_al, "A. lojaensis")
 p5_Narea <- plot_coefs(mod_Narea_hp, "H. purpurascens")
 p6_Narea <- plot_coefs(mod_Narea_wl, "W. loxensis")
 
-p1_iWUE <- plot_coefs(mod_iWUE_pt, "P. torta")
-p2_iWUE <- plot_coefs(mod_iWUE_cr, "C. racemosa")
-p3_iWUE <- plot_coefs(mod_iWUE_my, "M. sp")
-p4_iWUE <- plot_coefs(mod_iWUE_al, "A. lojaensis")
-p5_iWUE <- plot_coefs(mod_iWUE_hp, "H. purpurascens")
-p6_iWUE <- plot_coefs(mod_iWUE_wl, "W. loxensis")
-
 p1_SLA <- plot_coefs(mod_SLA_pt, "P. torta")
 p2_SLA <- plot_coefs(mod_SLA_cr, "C. racemosa")
 p3_SLA <- plot_coefs(mod_SLA_my, "M. sp")
 p4_SLA <- plot_coefs(mod_SLA_al, "A. lojaensis")
 p5_SLA <- plot_coefs(mod_SLA_hp, "H. purpurascens")
-p6_SLA <- plot_coefs(mod_SLA_wl, "W. loxensis")
+p6_SLA <- plot_coefs(mod_SLA_wl, "W. loxensis",color="green")
 
 (p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE)/
 (p1_Narea | p2_Narea | p3_Narea | p4_Narea | p5_Narea | p6_Narea) /
@@ -530,66 +574,24 @@ p6_SLA <- plot_coefs(mod_SLA_wl, "W. loxensis")
 ```
 
 
-```{r diagnostiscs common }
 
-plot_diagnostics <- function(model, model_name) {
-  
-  res <- residuals(model)#residual
-  fit <- fitted(model) #model
-  
-  par(mfrow = c(1, 2)) #graph
-  
-  # Residuals vs Fitted
-  plot(fit, res,
-       xlab = "Fitted values",
-       ylab = "Residuals",
-       main = paste(model_name, "\nResiduals vs Fitted"))
-  abline(h = 0, col = "red", lty = 2)
-  
-  # QQ plot
-  qqnorm(res, main = paste(model_name, "\nNormal Q-Q"))
-  qqline(res, col = "red", lty = 2)
-  
-  par(mfrow = c(1, 1))
-  #plot()
-  
-}
-
-#apply the plot_diagnostics_to_all
-pdf("model_diagnostics_species_dummies.pdf", width = 10, height = 5)
-
-for (nm in names(models_iWUE_d)) {
-  plot_diagnostics(models_iWUE_d[[nm]], nm)
-}
-
-for (nm in names(models_estq_d)) {
-  plot_diagnostics(models_estq_d[[nm]], nm)
-}
-
-for (nm in names(models_leafstr_d)) {
-  plot_diagnostics(models_leafstr_d[[nm]], nm)
-}
-
-dev.off()
-
-```
-## Narea y Parea 
+## TEST ADICIONALES Narea y Parea 
 
 ```{r test}
 
-mod_iwue_narea_pt = lmer(`iWUE (μmol/mol)`~ Narea+SUB +(1|Bloque), data = datos_Pouteria)
-mod_iwue_narea_cr= lmer(`iWUE (μmol/mol)`~ Narea+SUB +(1|Bloque), data = datos_Clarisia)
-mod_iwue_narea_al= lmer(`iWUE (μmol/mol)`~ Narea+SUB +(1|Bloque), data = datos_al)
-mod_iwue_narea_my= lmer(`iWUE (μmol/mol)`~ Narea+SUB +(1|Bloque), data = datos_myrcia)
-mod_iwue_narea_hp= lmer(`iWUE (μmol/mol)`~ Narea+SUB +(1|Bloque), data = datos_hp)
-mod_iwue_narea_we= lmer(`iWUE (μmol/mol)`~ Narea+SUB +(1|Bloque), data = datos_Weinmania)
+mod_iwue_narea_pt = lmer(`iWUE (μmol/mol)`~ N_area+SUB +(1|Bloque), data = datos_Pouteria)
+mod_iwue_narea_cr= lmer(`iWUE (μmol/mol)`~ N_area+SUB +(1|Bloque), data = datos_Clarisia)
+mod_iwue_narea_al= lmer(`iWUE (μmol/mol)`~ N_area+SUB +(1|Bloque), data = datos_al)
+mod_iwue_narea_my= lmer(`iWUE (μmol/mol)`~ N_area+SUB +(1|Bloque), data = datos_myrcia)
+mod_iwue_narea_hp= lmer(`iWUE (μmol/mol)`~ N_area+SUB +(1|Bloque), data = datos_hp)
+mod_iwue_narea_we= lmer(`iWUE (μmol/mol)`~ N_area+SUB +(1|Bloque), data = datos_Weinmania)
 
-imod_iwue_narea_pt = lmer(`iWUE (μmol/mol)`~ Narea*SUB +(1|Bloque), data = datos_Pouteria)
-imod_iwue_narea_cr= lmer(`iWUE (μmol/mol)`~ Narea*SUB +(1|Bloque), data = datos_Clarisia)
-imod_iwue_narea_al= lmer(`iWUE (μmol/mol)`~ Narea*SUB +(1|Bloque), data = datos_al)
-imod_iwue_narea_my= lmer(`iWUE (μmol/mol)`~ Narea*SUB +(1|Bloque), data = datos_myrcia)
-imod_iwue_narea_hp= lmer(`iWUE (μmol/mol)`~ Narea*SUB +(1|Bloque), data = datos_hp)
-imod_iwue_narea_we= lmer(`iWUE (μmol/mol)`~ Narea*SUB +(1|Bloque), data = datos_Weinmania)
+imod_iwue_narea_pt = lmer(`iWUE (μmol/mol)`~ N_area*SUB +(1|Bloque), data = datos_Pouteria)
+imod_iwue_narea_cr= lmer(`iWUE (μmol/mol)`~ N_area*SUB +(1|Bloque), data = datos_Clarisia)
+imod_iwue_narea_al= lmer(`iWUE (μmol/mol)`~ N_area*SUB +(1|Bloque), data = datos_al)
+imod_iwue_narea_my= lmer(`iWUE (μmol/mol)`~ N_area*SUB +(1|Bloque), data = datos_myrcia)
+imod_iwue_narea_hp= lmer(`iWUE (μmol/mol)`~ N_area*SUB +(1|Bloque), data = datos_hp)
+imod_iwue_narea_we= lmer(`iWUE (μmol/mol)`~ N_area*SUB +(1|Bloque), data = datos_Weinmania)
 summary(mod_iwue_narea_pt)
 summary(mod_iwue_narea_cr)
 summary(mod_iwue_narea_al)
