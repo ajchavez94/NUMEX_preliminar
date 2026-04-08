@@ -66,7 +66,7 @@ def create_boxplots_control(var, data):
     # -----------------------------
     # CREATE EXACTLY 6 AXES (2 × 3)
     # -----------------------------
-    fig, axes = plt.subplots(1, 6, figsize=(10, 6.5), sharey=True)
+    fig, axes = plt.subplots(1, 6, figsize=(10, 4.5), sharey=True)
     #axes = axes.flatten()
 
     # -----------------------------
