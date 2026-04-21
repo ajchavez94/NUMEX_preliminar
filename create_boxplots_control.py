@@ -49,7 +49,16 @@ def create_boxplots_control(var, data):
         "Weinmania  loxensis"   # 3000
     ]
 
-    df_long["name"] = pd.Categorical(df_long["name"], categories=final_order, ordered=True)
+    final_order_23 = [
+        "Pouteria torta",       # 1000
+        "Myrcia sp nov",        # 2000
+        "Hedyosmun  purpurascens",  # 3000
+        "Clarisia  racemosa",   # 1000
+        "Alchornea lojaensis",  # 2000
+        "Weinmania  loxensis",   # 3000
+    ]
+
+    df_long["name"] = pd.Categorical(df_long["name"], categories=final_order_23, ordered=True)
 
     # -----------------------------
     # Color palette
@@ -66,13 +75,13 @@ def create_boxplots_control(var, data):
     # -----------------------------
     # CREATE EXACTLY 6 AXES (2 × 3)
     # -----------------------------
-    fig, axes = plt.subplots(1, 6, figsize=(10, 4.5), sharey=True)
-    #axes = axes.flatten()
+    fig, axes = plt.subplots(2, 3, figsize=(10, 7), sharey=True,sharex=True)
+    axes = axes.flatten()
 
     # -----------------------------
     # PLOT EACH SPECIES
     # -----------------------------
-    for i, sp in enumerate(final_order):
+    for i, sp in enumerate(final_order_23):
         ax = axes[i]
         subdf = df_long[df_long["name"] == sp]
         

@@ -211,12 +211,19 @@ filter(data$genus == "Weinmania")
 
 ## IWUE
 
-mod_iWUE_pt <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Pouteria)# is Singular (1 | Bloque)
-mod_iWUE_cr <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Clarisia)#is Singular
-mod_iWUE_al <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_al)
-mod_iWUE_my <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_myrcia)#isSingular
-mod_iWUE_hp <- lm(`iWUE (μmol/mol)` ~SUB, data = datos_hp) #isSingular
-mod_iWUE_wl <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Weinmania)
+mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_Pouteria)# is Singular 
+mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_Clarisia)#is Singular
+mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ SUB+ (1 | Bloque) , data = datos_al)
+mod_iWUE_my <- lmer(`iWUE (μmol/mol)` ~ SUB+(1 | Bloque), data = datos_myrcia)#isSingular
+mod_iWUE_hp <- lmer(`iWUE (μmol/mol)` ~SUB+(1 | Bloque), data = datos_hp) #isSingular
+mod_iWUE_wl <- lmer(`iWUE (μmol/mol)` ~ SUB+(1 | Bloque), data = datos_Weinmania)
+
+modlm_iWUE_pt <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Pouteria)
+modlm_iWUE_cr <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Clarisia)
+modlm_iWUE_al <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_al)
+modlm_iWUE_my <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_myrcia)
+modlm_iWUE_hp <- lm(`iWUE (μmol/mol)` ~SUB, data = datos_hp) 
+modlm_iWUE_wl <- lm(`iWUE (μmol/mol)` ~ SUB , data = datos_Weinmania)
 
 summary(mod_iWUE_pt)
 summary(mod_iWUE_cr)
@@ -225,7 +232,12 @@ summary(mod_iWUE_my)
 summary(mod_iWUE_hp)
 summary(mod_iWUE_wl)
 
-
+summary(modlm_iWUE_pt)
+summary(modlm_iWUE_cr)
+summary(modlm_iWUE_al)
+summary(modlm_iWUE_my)
+summary(modlm_iWUE_hp)
+summary(modlm_iWUE_wl)
 ### C13 
 mod_C13_pt <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_Pouteria)
 mod_C13_cr <- lmer(`δ13C (‰ v.s.V-PDB)` ~ SUB + (1 | Bloque), data = datos_Clarisia)
@@ -581,6 +593,7 @@ for (name in names(models_leaf)) {
 }
 ```
 ## 4. GRAFICOS
+
 ```{r GGPLOT }
 
 p1_iWUE <- plot_coefs(mod_iWUE_pt, "P. torta",color="#458B74")
@@ -617,6 +630,76 @@ p6_SLA <- plot_coefs(mod_SLA_wl, "W. loxensis",color="#CD661D")
 
 (p1_SLA  | p2_SLA  | p3_SLA  | p4_SLA  | p5_SLA  | p6_SLA)
 
+
+```
+## 4.2. GRAFICOS 2
+```{r GGPLOT2}
+
+p1_iWUE <- plot_coefs(mod_iWUE_pt, "P. torta",color="#458B74")
+p2_iWUE <- plot_coefs(mod_iWUE_cr, "C. racemosa",color="#458B74")
+p3_iWUE <- plot_coefs(mod_iWUE_my, "M. sp",color="#458B74")
+p4_iWUE <- plot_coefs(mod_iWUE_al, "A. lojaensis",color="#458B74")
+p5_iWUE <- plot_coefs(mod_iWUE_hp, "H. purpurascens",color="#458B74")
+p6_iWUE <- plot_coefs(mod_iWUE_wl, "W. loxensis",color="#458B74")
+
+#logNmass
+p1_Narea <- plot_coefs(mod_logNmass_pt, "P.torta",color="#458B00")
+p2_Narea <- plot_coefs(mod_logNmass_cr, "C. racemosa",color="#458B00")
+p3_Narea <- plot_coefs(mod_logNmass_my, "M. sp",color="#458B00")
+p4_Narea <- plot_coefs(mod_logNmass_al, "A. lojaensis",color="#458B00")
+p5_Narea <- plot_coefs(mod_logNmass_hp, "H. purpurascens",color="#458B00")
+p6_Narea <- plot_coefs(mod_logNmass_wl, "W. loxensis",color="#458B00")
+
+p1_Parea <- plot_coefs(mod_logPmass_pt, "P.torta",color="#CD5B45")
+p2_Parea <- plot_coefs(mod_logPmass_cr, "C. racemosa",color="#CD5B45")
+p3_Parea <- plot_coefs(mod_logPmass_my, "M. sp",color="#CD5B45")
+p4_Parea <- plot_coefs(mod_logPmass_al, "A. lojaensis",color="#CD5B45")
+p5_Parea <- plot_coefs(mod_logPmass_hp, "H. purpurascens",color="#CD5B45")
+p6_Parea <- plot_coefs(mod_logPmass_wl, "W. loxensis",color="#CD5B45")
+
+
+p1_SLA <- plot_coefs(mod_fol_NP_pt
+, "P. torta",color="#CD661D")
+p2_SLA <- plot_coefs(mod_fol_NP_cr, "C. racemosa",color="#CD661D")
+p3_SLA <- plot_coefs(mod_fol_NP_my, "M. sp",color="#CD661D")
+p4_SLA <- plot_coefs(mod_fol_NP_al, "A. lojaensis",color="#CD661D")
+p5_SLA <- plot_coefs(mod_fol_NP_hp, "H. purpurascens",color="#CD661D")
+p6_SLA <- plot_coefs(mod_fol_NP_wl, "W. loxensis",color="#CD661D")
+
+remove_title <- theme(plot.title = element_blank())
+
+# aplicar a todas menos la primera fila
+p1_Narea <- p1_Narea + remove_title
+p2_Narea <- p2_Narea + remove_title
+p3_Narea <- p3_Narea + remove_title
+p4_Narea <- p4_Narea + remove_title
+p5_Narea <- p5_Narea + remove_title
+p6_Narea <- p6_Narea + remove_title
+
+p1_Parea <- p1_Parea + remove_title
+p2_Parea <- p2_Parea + remove_title
+p3_Parea <- p3_Parea + remove_title
+p4_Parea <- p4_Parea + remove_title
+p5_Parea <- p5_Parea + remove_title
+p6_Parea <- p6_Parea + remove_title
+
+p1_SLA <- p1_SLA + remove_title
+p2_SLA <- p2_SLA + remove_title
+p3_SLA <- p3_SLA + remove_title
+p4_SLA <- p4_SLA + remove_title
+p5_SLA <- p5_SLA + remove_title
+p6_SLA <- p6_SLA + remove_title
+
+
+final_plot <- (p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE) /
+              (p1_Narea | p2_Narea | p3_Narea | p4_Narea | p5_Narea | p6_Narea) /
+              (p1_Parea | p2_Parea | p3_Parea | p4_Parea | p5_Parea | p6_Parea) /
+              (p1_SLA  | p2_SLA  | p3_SLA  | p4_SLA  | p5_SLA  | p6_SLA)
+
+ggsave("figure_poster.png",
+       plot = final_plot,
+       width = 16, height = 12,  # ajusta según tu póster
+       dpi = 300)               # 300–600 para alta calidad
 
 ```
 
@@ -695,7 +778,27 @@ summary(imod_iwue_Parea_we)
 
 #anova(mod1, mod2)
 ```
+# Efectos graficos:
+```{r test}
+#install.packages("effects")
+library("effects")
+
+m <- lmer(`iWUE (μmol/mol)`~ SUB+(1|Bloque),data=datos_Weinmania, REML=TRUE)
+e <- allEffects(m)
+print(e)
+
+# allEffects() returns a list, but for our model (where everything can interact with everything), there's only one element
+e1 <- e[[1]]
+e.df <- as.data.frame(e1)
+library(ggplot2)
+g <- ggplot(e.df,aes(x=SUB,y=fit,ymin=lower,ymax=upper)) + 
+    geom_pointrange(position=position_dodge(width=.1)) + 
+    xlab("SUB") + ylab("iWUE") + ggtitle("Effect of Recipe and Temperature on Breaking Angle")
+plot(g)
+
+
 ```
+
 
 ```{r DHARMA diagnostics}
 # Run and plot

@@ -1,3 +1,5 @@
+import numpy as np
+
 def formula_iWUE(iWUE,delt13Cair,Cair):
   print("No Delete [C] m/m (%) values lower than 35%")
   #iWUE = iWUE.loc[iWUE['[C] m/m (%)'] >= 35]
@@ -29,27 +31,49 @@ def calculate_iWUE(iWUE,CO2):
      #HELP: Once I have the results then maybe correct. 
 
  #Ask the user if we want Manu Lloa, if yes = 1, if No, observation = 0, 
-    if CO2 == "on_site":
+    if CO2 == "option_1":
         # ---- on_site code ----
-        print("You choose on site")
-        delt13Cair = -13.56 #9.22 ### data from Observations in the North. The values collected are too high.. Probar con 13.56
+        print("You choose on d13C site and CO2 obs Manu Lloa")
+        delt13Cair = -9.15 #9.22 ### data from Observations in the North. 
         Cair = 423.1142299   #data mean for Ecuador samples 458.9521799015872 but I am using the one for Manu Lloa and delta13 from mean observations.
         # data for 2024 Napo mean is 458. Why is it so high?
         iWUE = formula_iWUE(iWUE,delt13Cair,Cair)
         print("iWUE añadida")
 
-        
-    elif CO2 == "manuloa":
+        return iWUE
+    
+    elif CO2 == "option_2":
         # ---- manuloa code ----
-        print("You choose observatory data")
-        delt13Cair = -9.085684858  #data for 2024 manu lloa. si cambia con elevacion. 
+        print("You choose observatory data both CO2 and d13C")
+        delt13Cair = -8.6  #data for 2024 manu lloa. si cambia con elevacion. 
         Cair = 423.1142299 
         iWUE = formula_iWUE(iWUE,delt13Cair,Cair)
         print("iWUE añadida")
 
+        return iWUE
+
+
+    elif CO2 == "option_3":
+         print("Using elevation-dependent values")
+
+         df = iWUE.copy()
+
+         conditions = [
+            df["elevation_m"] == 1000,
+            df["elevation_m"] == 2000,
+            df["elevation_m"] == 3000
+        ]
+
+         delta_values = [-8.714103, -9.23, -9.5219]
+         Cair = 455
+
+         df["delt13Cair"] = np.select(conditions, delta_values, default=np.nan)
+
+         return formula_iWUE(df, df["delt13Cair"], Cair)
+
     else:
         raise ValueError(
-            "argument must be either 'on_site' or 'manuloa'"
+            "argument must be either 'option_1"
         )
 
     return iWUE
