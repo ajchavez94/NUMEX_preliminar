@@ -65,9 +65,9 @@ def create_boxplots_control(var, data):
     # -----------------------------
     palette_Sub = {
         "C": "#A3A3A3",
-        "N": "#70b7f5",
-        "P": "#F7AC58FF",
-        "NP": "#f080ca",
+        "N": "#4619eb",
+        "P": "#FFFC40FF",
+        "NP": "#ff2b47",
     }
 
     sns.set(style="whitegrid")

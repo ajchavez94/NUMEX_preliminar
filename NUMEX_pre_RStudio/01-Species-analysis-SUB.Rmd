@@ -58,7 +58,7 @@ data <- dplyr::select(data,
         `N`,
         `P`,
         `Bloque`,
-        `elevation_m`,
+        `elevation_m`,`sampling date`,
     `iWUE (μmol/mol)`,
     `δ18O in ‰ vs DeltaSMOW`,
     `Specific leaf area (cm²/g)`,
@@ -68,28 +68,25 @@ data <- dplyr::select(data,
     Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area)
 ```
 
-
+# ANOVA
+Tendencias generales
 
 ```{r ANOVA }
 #global ANOVA for all the samples
-#variables = δ18O in ‰ vs DeltaSMOW`
+controles <- data %>%
+  filter(SUB == "C")
+# Species order
+table(controles$name, controles$elevation_m)
+
+controles$elevation_m <- as.factor(controles$elevation_m)
+controles$name <- as.factor(controles$name)
   
-anova_species_treat <- aov( `iWUE (μmol/mol)`~ name * SUB, data = data) #Uses all dataset. Interaction between species and treatment
+anova_species_treat <- aov( `iWUE (μmol/mol)`~ elevation_m, data = controles) #Uses all dataset. Interaction between species and treatment
 summary(anova_species_treat)
 
-# Species order
-species_order <- c(
-  "Pouteria torta",
-  "Alchornea lojaensis",
-  "Weinmania loxensis",
-  "Clarisia racemosa",
-  "Myrcia sp nov",
-  "Hedyosmun purpurascens"
-)
+TukeyHSD(anova_species_treat, "elevation_m")
 
-data$name <- factor(data$name, levels = species_order)
-
-# Elevation map
+shapiro.test(residuals(anova_species_treat))
 ```
 # Funciones to be used
 ## GRAPH
@@ -193,6 +190,15 @@ tabla <- function(model_list) {
 
 ``` 
 
+
+```{r plot}
+
+plot_iwue <- make_species_plots("iWUE (μmol/mol)",
+                                 y_label = "iWUE (μmol/mol)",
+                               y_limits = c(25,120))
+plot_iwue
+```
+
 # 1. ISOTOPOS
 
 ```{r Modelos sin interaccion }
@@ -265,6 +271,8 @@ mod_Ci_my <- lmer(Ci~ SUB + (1 | Bloque), data = datos_myrcia)
 mod_Ci_hp <- lmer(Ci~ SUB + (1 | Bloque), data = datos_hp)
 mod_Ci_wl <- lmer(Ci ~ SUB + (1 | Bloque), data = datos_Weinmania)
 ```
+
+
 ```{r listado}
 #source("tabla_SUB.R")
 
