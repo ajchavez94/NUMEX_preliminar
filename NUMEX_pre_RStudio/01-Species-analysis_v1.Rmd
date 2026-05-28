@@ -208,9 +208,14 @@ The graphic for C13/o18 are created in python.
 #global ANOVA for all the samples
 #variables = δ18O in ‰ vs DeltaSMOW`
   
-anova_species_treat <- aov( `iWUE (μmol/mol)`~ name * Sub, data = data) #Uses all dataset. Interaction between species and treatment
+anova_species_treat <- aov( `iWUE (μmol/mol)`~ genus * SUB, data = data) #Uses all dataset. Interaction between species and treatment
 summary(anova_species_treat)
 ```
+```{r}
+# Tukey test for species
+TukeyHSD(anova_species_treat, which = "genus")
+```
+
 
 
 
