@@ -58,7 +58,7 @@ def create_boxplots_control(var, data):
         "Weinmania  loxensis",   # 3000
     ]
 
-    df_long["name"] = pd.Categorical(df_long["name"], categories=final_order_23, ordered=True)
+    df_long["name"] = pd.Categorical(df_long["name"], categories=final_order, ordered=True)
 
     # -----------------------------
     # Color palette
@@ -75,30 +75,32 @@ def create_boxplots_control(var, data):
     # -----------------------------
     # CREATE EXACTLY 6 AXES (2 × 3)
     # -----------------------------
-    fig, axes = plt.subplots(2, 3, figsize=(10, 7), sharey=True,sharex=True)
+    fig, axes = plt.subplots(1, 6, figsize=(10, 4.5), sharey=True,sharex=True, gridspec_kw={'wspace': 0.025,'hspace':0.05})
     axes = axes.flatten()
 
     # -----------------------------
     # PLOT EACH SPECIES
     # -----------------------------
-    for i, sp in enumerate(final_order_23):
+    for i, sp in enumerate(final_order):
         ax = axes[i]
         subdf = df_long[df_long["name"] == sp]
-        
-        sns.boxplot(
-            data=subdf,
-            x="Sub", y="valor",
-            #palette=palette_Sub,
-            color=".9", 
-            linecolor="black", linewidth=.85,
-            showmeans=True,
-            meanprops={"marker": "s",
-                       "markerfacecolor": "black",
-                        "markeredgecolor":"black",
-                       "markersize": "4"},
-            width = 0.65,
-            ax=ax
-        )
+
+        sns.violinplot(data=subdf, x="Sub", y="valor", inner_kws=dict(box_width=6, whis_width=1, color="0.5"),fill=False,ax=ax)
+
+        #sns.boxplot(
+        #    data=subdf,
+       #     x="Sub", y="valor",
+       #     #palette=palette_Sub,
+          #  color=".9", 
+          #  linecolor="black", linewidth=.85,
+          #  showmeans=True,
+        #    meanprops={"marker": "s",
+        #               "markerfacecolor": "black",
+        #                "markeredgecolor":"black",
+        #               "markersize": "4"},
+       #     width = 0.65,
+      #      ax=ax
+      #  )
 
         sns.swarmplot(
             data=subdf,

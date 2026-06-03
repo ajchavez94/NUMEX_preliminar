@@ -63,36 +63,13 @@ data <- dplyr::select(data,
     `δ18O in ‰ vs DeltaSMOW`,
     `Specific leaf area (cm²/g)`,
     `δ13C (‰ v.s.V-PDB)`,
-    `force to punch (kN/m)`, `Leaf area (cm²)`,`dry matter content (mg/g)`, `thickness (mm)`,`N:P`,`Ci/Ca`, Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area) 
+    `force to punch (kN/m)`, `Leaf area (cm²)`,`dry matter content (mg/g)`, `thickness (mm)`,`N:P`,`Ci/Ca`, Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area,LA) 
 #Δ13C_cell
 ```
 
-# ANOVA
-Tendencias generales
 
-
-
-```{r ANOVA }
-#global ANOVA for control
-controles <- data %>%
-  filter(SUB == "C")
-# Species order
-table(controles$name, controles$elevation_m)
-
-controles$elevation_m <- as.factor(controles$elevation_m)
-controles$name <- as.factor(controles$name)
-  
-anova_species_treat <- aov( `iWUE (μmol/mol)`~ elevation_m, data = controles) #Uses all dataset. Interaction between species and treatment
-summary(anova_species_treat)
-
-TukeyHSD(anova_species_treat, "elevation_m")
-
-shapiro.test(residuals(anova_species_treat))
-```
-# Funciones to be used
-## GRAPH
 ```{r funcion para graficar}
-plot_coefs <- function(model, title, color = "black") {
+plot_coefs <- function(model, title, color = "black",ylim=NULL,show_y=TRUE) {
 
   coefs <- broom.mixed::tidy(
     model,
@@ -111,7 +88,7 @@ plot_coefs <- function(model, title, color = "black") {
       )
     )
 
-  ggplot2::ggplot(coefs, ggplot2::aes(x = term, y = estimate)) +
+  p <- ggplot2::ggplot(coefs, ggplot2::aes(x = term, y = estimate)) +
     ggplot2::geom_point(size = 3, color = color) +
     ggplot2::geom_errorbar(
       ggplot2::aes(ymin = conf.low, ymax = conf.high),
@@ -138,10 +115,21 @@ plot_coefs <- function(model, title, color = "black") {
       y = "Estimate (± 95% CI)"
     ) +
     ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.2))) +
-    ggplot2::coord_cartesian(clip = "off") +
+    ggplot2::coord_cartesian( ylim = ylim,clip = "off") +
     ggplot2::theme(
-      axis.text.x = element_text(angle = 45, hjust = 1)
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.margin = margin(0,0,0,0)
     )
+  
+   if (!show_y) {
+    p <- p +
+      ggplot2::theme(
+        axis.title.y = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.ticks.y = element_blank()
+      )
+   }
+    return(p)
 }
 ```
 
@@ -191,13 +179,15 @@ tabla <- function(model_list) {
 
 ``` 
 
-
-
 # 1. ISOTOPOS
 
 ```{r Modelos sin interaccion }
 datos_Pouteria <- data %>%
 filter(data$genus == "Pouteria")
+
+datos_Pouteria <- datos_Pouteria %>%
+  filter(!(`iWUE (μmol/mol)` > 55 & SUB == "N")) #Eliminar los outliers.
+
 datos_Clarisia <- data %>%
 filter(data$genus == "Clarisia")
 datos_al <- data %>%
@@ -255,10 +245,6 @@ summary(mod_C13_wl)
 
 
 mod_Ci_pt <- lmer(`Ci/Ca` ~ SUB + (1 | Bloque), data = datos_Pouteria)
-
-#mod_N15_pt <- lmer(`δ15N (‰ v.s.AIR)` ~ SUB + (1 | Bloque), data = datos_Pouteria)
-#mod_CN_pt <- lmer(`C:N` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-#mod_O18_cr<- lmer(`δ18O in ‰ vs DeltaSMOW` ~SUB  + (1 | Bloque), data = datos_Clarisia)
 mod_Ci_cr <- lmer(`Ci/Ca` ~ SUB + (1 | Bloque), data = datos_Clarisia)
 mod_Ci_al <- lmer(`Ci/Ca` ~ SUB + (1 | Bloque), data = datos_al)
 mod_Ci_my <- lmer(`Ci/Ca`~ SUB + (1 | Bloque), data = datos_myrcia)
@@ -536,12 +522,12 @@ mod_Tough_hp <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_h
 mod_Tough_wl <- lmer(`force to punch (kN/m)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
 
 
-mod_la_pt <- lmer(`Leaf area (cm²)` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
-mod_la_cr <- lmer(`Leaf area (cm²)`~ SUB+ (1 | Bloque), data = datos_Clarisia)
-mod_la_al <- lmer(`Leaf area (cm²)` ~ SUB+ (1 | Bloque), data = datos_al)
-mod_la_my <- lmer(`Leaf area (cm²)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
-mod_la_hp <- lmer(`Leaf area (cm²)` ~ SUB+ (1 | Bloque), data = datos_hp)
-mod_la_wl <- lmer(`Leaf area (cm²)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+mod_la_pt <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_la_cr <- lmer(`LA`~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_la_al <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_la_my <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_la_hp <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_hp)
+mod_la_wl <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
 
 
 mod_dmc_pt <- lmer(`dry matter content (mg/g)` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
@@ -660,11 +646,77 @@ p4_SLA <- plot_coefs(mod_SLA_al, "A. lojaensis",color="#CD661D")
 p5_SLA <- plot_coefs(mod_SLA_hp, "H. purpurascens",color="#CD661D")
 p6_SLA <- plot_coefs(mod_SLA_wl, "W. loxensis",color="#CD661D")
 
-(p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE)/
-(p1_Narea | p2_Narea | p3_Narea | p4_Narea | p5_Narea | p6_Narea) /
-(p1_Parea | p2_Parea | p3_Parea | p4_Parea | p5_Parea | p6_Parea) /
+library(patchwork)
 
-(p1_SLA  | p2_SLA  | p3_SLA  | p4_SLA  | p5_SLA  | p6_SLA)
+library(broom.mixed)
+library(dplyr)
+
+mods_iWUE <- list(
+  mod_iWUE_pt,
+ mod_iWUE_cr,
+ mod_iWUE_al,
+  mod_iWUE_my,
+  mod_iWUE_hp,
+  mod_iWUE_wl
+)
+
+all_coefs <- lapply(mods_iWUE, function(m){
+
+  broom.mixed::tidy(
+    m,
+    effects = "fixed",
+    conf.int = TRUE
+  ) %>%
+  filter(term != "(Intercept)")
+
+}) %>%
+bind_rows()
+
+ylim_iWUE <- c(
+  min(all_coefs$conf.low),
+  max(all_coefs$conf.high)
+)
+p1_iWUE <- plot_coefs(
+  mod_iWUE_pt,
+  "Species 1",
+  ylim = ylim_iWUE,
+  show_y = TRUE
+)
+
+p2_iWUE <- plot_coefs(
+  mod_iWUE_cr,
+  "Species 2",
+  ylim = ylim_iWUE,
+  show_y = FALSE
+)
+
+p3_iWUE <- plot_coefs(
+  mod_iWUE_al,
+  "Species 3",
+  ylim = ylim_iWUE,
+  show_y = FALSE
+)
+
+final_plot <-
+(
+  p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE
+) /
+(
+  p1_Narea | p2_Narea | p3_Narea | p4_Narea | p5_Narea | p6_Narea
+) /
+(
+  p1_Parea | p2_Parea | p3_Parea | p4_Parea | p5_Parea | p6_Parea
+) +
+plot_layout(
+  guides = "collect"
+) &
+theme(
+  panel.spacing = unit(0, "lines"),
+  plot.margin = margin(0,0,0,0),
+  legend.position = "bottom"
+)
+
+final_plot
 
 
 ```
@@ -778,8 +830,7 @@ summary(imod_iwue_narea_we)
 #mod2 <- lmer(`iWUE (μmol/mol)` ~ Narea + SUB + (1|Bloque), data = datos_Clarisia)
 
 #anova(mod1, mod2)
-```
-```{r Parea}
+
 
 mod_iwue_Parea_pt = lmer(`iWUE (μmol/mol)`~ P_area+SUB +(1|Bloque), data = datos_Pouteria)
 mod_iwue_Parea_cr= lmer(`iWUE (μmol/mol)`~ P_area+SUB +(1|Bloque), data = datos_Clarisia)
@@ -828,11 +879,17 @@ library(patchwork)
 # =========================================================
 
 sub_colors <- c(
+  "C"  = "grey40",
   "N"  = "blue",
   "P"  = "yellow",
   "NP" = "red"
 )
 
+row_limits <- list(
+  c(10, 130),    # fila 1
+  c(-23, -33),   # fila 2
+  c(0.5, 0.95)    # fila 6
+)
 # =========================================================
 # Function to create effect plot
 # =========================================================
@@ -858,8 +915,7 @@ plot_effects <- function(model, title_name){
           ymax = upper,
           color = SUB
         )
-      ) +
-
+      )  +
       geom_pointrange(
         position = position_dodge(width = 0.1),
         size = 0.8
@@ -874,13 +930,13 @@ plot_effects <- function(model, title_name){
         color = "SUB"
       ) +
 
-      theme_bw() +
+      theme_gray() +
 
       theme(
         plot.title = element_text(
           hjust = 0.5,
-          face = "bold"
-        ),
+          face = "bold",axis.line = element_line(linewidth = 3, colour = "grey80"),
+          panel.grid.major = element_line(colour = "grey80")),
 
         axis.text = element_text(size = 10),
         axis.title = element_text(size = 11),
@@ -895,15 +951,21 @@ plot_effects <- function(model, title_name){
 # =========================================================
 
 plot_list <- lapply(
-  names(models_leaf),
-  function(name){
+  seq_along(names(models_iWUE)),
+  function(i){
 
-    model <- models_leaf[[name]]
+    model <- models_iWUE[[i]]
+    # identificar fila
+    row_id <- ceiling(i / 6)
+    
 
     plot_effects(
       model = model,
-      title_name = name
-    )
+      title_name = names(models_iWUE)[i]
+    ) +
+      coord_cartesian(
+        ylim = row_limits[[row_id]]
+      )
   }
 )
 
@@ -911,19 +973,19 @@ plot_list <- lapply(
 # Arrange in 6 rows x 3 columns
 # =========================================================
 
-#final_plot <- wrap_plots(
-#  plot_list,
-#  ncol = 3,
-##  nrow = 3
-#)
+final_plot <- wrap_plots(
+  plot_list,
+  ncol = 6,
+ nrow = 3,
+guides = "collect"
+) &
+theme(
+  legend.position = "bottom"
+)
+
 
 # Display
 final_plot
-
-# =========================================================
-# Display plots
-# =========================================================
-
 # =========================================================
 # OPTIONAL: Save all plots
 # =========================================================
@@ -932,9 +994,41 @@ ggsave(
   "all_leaf_effects.png",
   final_plot,
   width = 18,
-  height = 20,
+  height = 12,
   dpi = 300
 )
+```
+
+
+
+
+```{r}
+plot_model(mod_Nmass_al,vline.color = "red",show.values = TRUE, value.offset = .2)
+
+
+library(sjPlot)
+library(broom.mixed)
+library(dplyr)
+library(ggplot2)
+
+# extraer p-values
+coefs <- broom.mixed::tidy(mod_Nmass_al) %>%
+  filter(effect == "fixed")
+
+# vector de colores
+cols <- ifelse(coefs$p.value < 0.05, "red", "black")
+
+# plot
+p <- plot_model(
+  mod_Nmass_al,
+  vline.color = "grey40",
+  show.values = TRUE,
+  value.offset = .2
+)
+
+# cambiar colores
+
+p 
 ```
 
 

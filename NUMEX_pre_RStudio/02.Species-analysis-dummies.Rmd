@@ -51,6 +51,7 @@ data$logPmass <- log(data$LPC) #
 data$SUB = data$Sub #porque abajo esta en mayuscula
 
 #solo dejar las necesarias
+#solo dejar las necesarias
 data <- dplyr::select(data,
         `name`,
         `genus`,
@@ -63,37 +64,14 @@ data <- dplyr::select(data,
     `δ18O in ‰ vs DeltaSMOW`,
     `Specific leaf area (cm²/g)`,
     `δ13C (‰ v.s.V-PDB)`,
-    `force to punch (kN/m)`,
-    `thickness (mm)`,`N:P`,
-    Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area)
-```
-
-
-
-```{r ANOVA }
-#global ANOVA for all the samples
-#variables = δ18O in ‰ vs DeltaSMOW`
-  
-anova_species_treat <- aov( `iWUE (μmol/mol)`~ name * SUB, data = data) #Uses all dataset. Interaction between species and treatment
-summary(anova_species_treat)
-
-# Species order
-species_order <- c(
-  "Pouteria torta",
-  "Alchornea lojaensis",
-  "Weinmania loxensis",
-  "Clarisia racemosa",
-  "Myrcia sp nov",
-  "Hedyosmun purpurascens"
-)
-
-data$name <- factor(data$name, levels = species_order)
-
-# Elevation map
+    `force to punch (kN/m)`, `Leaf area (cm²)`,`dry matter content (mg/g)`, `thickness (mm)`,`N:P`,`Ci/Ca`, Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area,LA) 
 ```
 # Funciones to be used
-## GRAPH
+z## GRAPH
+
 ```{r funcion para graficar}
+
+### Plotea coeficientes.
 plot_coefs <- function(model, title, color = "black") {
 
   coefs <- broom.mixed::tidy(
@@ -210,13 +188,18 @@ datos_Weinmania <- data %>%
 filter(data$genus == "Weinmania")
 
 ## IWUE
+#row_limits <- list(
+#  c(10,110),
+#  c(-33,-23),
+#  c(0.5,0.95)
+#)
 
-mod_iWUE_pt <- lm(`iWUE (μmol/mol)` ~ N*P , data = datos_Pouteria)# is Singular (1 | Bloque)
-mod_iWUE_cr <- lm(`iWUE (μmol/mol)` ~ N*P , data = datos_Clarisia)#is Singular
-mod_iWUE_al <- lm(`iWUE (μmol/mol)` ~ N*P , data = datos_al)
-mod_iWUE_my <- lm(`iWUE (μmol/mol)` ~ N*P , data = datos_myrcia)#isSingular
-mod_iWUE_hp <- lm(`iWUE (μmol/mol)` ~ N*P, data = datos_hp) #isSingular
-mod_iWUE_wl <- lm(`iWUE (μmol/mol)` ~ N*P , data = datos_Weinmania)
+mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ N*P+ (1 | Bloque) , data = datos_Pouteria)# 
+mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ N*P+ (1 | Bloque) , data = datos_Clarisia)#is Singular
+mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque), data = datos_al)
+mod_iWUE_my <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque), data = datos_myrcia)#isSingular
+mod_iWUE_hp <- lmer(`iWUE (μmol/mol)` ~ N*P+ (1 | Bloque), data = datos_hp) #isSingular
+mod_iWUE_wl <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque), data = datos_Weinmania)
 
 summary(mod_iWUE_pt)
 summary(mod_iWUE_cr)
@@ -242,12 +225,12 @@ summary(mod_C13_hp)
 summary(mod_C13_wl)
 
 
-mod_Ci_pt <- lmer(Ci ~ N*P + (1 | Bloque), data = datos_Pouteria)
-mod_Ci_cr <- lmer(Ci ~ N*P + (1 | Bloque), data = datos_Clarisia)
-mod_Ci_al <- lmer(Ci ~ N*P + (1 | Bloque), data = datos_al)
-mod_Ci_my <- lmer(Ci~ N*P + (1 | Bloque), data = datos_myrcia)
-mod_Ci_hp <- lmer(Ci~ N*P + (1 | Bloque), data = datos_hp)
-mod_Ci_wl <- lmer(Ci ~ N*P + (1 | Bloque), data = datos_Weinmania)
+mod_Ci_pt <- lmer(`Ci/Ca` ~ N*P + (1 | Bloque), data = datos_Pouteria)
+mod_Ci_cr <- lmer(`Ci/Ca` ~ N*P + (1 | Bloque), data = datos_Clarisia)
+mod_Ci_al <- lmer(`Ci/Ca` ~ N*P + (1 | Bloque), data = datos_al)
+mod_Ci_my <- lmer(`Ci/Ca`~ N*P + (1 | Bloque), data = datos_myrcia)
+mod_Ci_hp <- lmer(`Ci/Ca`~ N*P + (1 | Bloque), data = datos_hp)
+mod_Ci_wl <- lmer(`Ci/Ca` ~ N*P + (1 | Bloque), data = datos_Weinmania)
 ```
 ```{r listado}
 #source("tabla_SUB.R")
@@ -464,6 +447,36 @@ models_est <- list(
 "Leaf N:P | 3000 | Weinmannia" = mod_fol_NP_wl
 )
 
+models_N_graphic <- list(
+
+"logNmass | 1000 | Pouteria" = mod_logNmass_pt,
+"logNmass | 1000 | Clarisia" = mod_logNmass_cr,
+"logNmass | 2000 | Alchornea" = mod_logNmass_al,
+"logNmass | 2000 | Myrcia" = mod_logNmass_my,
+"logNmass | 3000 | Hedyosmum" = mod_logNmass_hp,
+"logNmass | 3000 | Weinmannia" = mod_logNmass_wl,
+
+"logLPC | 1000 | Pouteria" = mod_logPmass_pt,
+"logLPC | 1000 | Clarisia" = mod_logPmass_cr,
+"logLPC | 2000 | Alchornea" = mod_logPmass_al,
+"logLPC | 2000 | Myrcia" = mod_logPmass_my,
+"logLPC | 3000 | Hedyosmum" = mod_logPmass_hp,
+"logLPC | 3000 | Weinmannia" = mod_logPmass_wl,
+
+"Narea | 1000 | Pouteria" = mod_Narea_pt,
+"Narea | 1000 | Clarisia" = mod_Narea_cr,
+"Narea | 2000 | Alchornea" = mod_Narea_al,
+"Narea | 2000 | Myrcia" = mod_Narea_my,
+"Narea | 3000 | Hedyosmum" = mod_Narea_hp,
+"Narea | 3000 | Weinmannia" = mod_Narea_wl,
+
+"Leaf N:P | 1000 | Pouteria" = mod_fol_NP_pt,
+"Leaf N:P | 1000 | Clarisia" = mod_fol_NP_cr,
+"Leaf N:P | 2000 | Alchornea" = mod_fol_NP_al,
+"Leaf N:P | 2000 | Myrcia" = mod_fol_NP_my,
+"Leaf N:P | 3000 | Hedyosmum" = mod_fol_NP_hp,
+"Leaf N:P | 3000 | Weinmannia" = mod_fol_NP_wl
+)
 ```
 ## 2.1. Tabla
 ```{r tabla 2}
@@ -607,13 +620,18 @@ p4_SLA <- plot_coefs(mod_SLA_al, "A. lojaensis",color="#CD661D")
 p5_SLA <- plot_coefs(mod_SLA_hp, "H. purpurascens",color="#CD661D")
 p6_SLA <- plot_coefs(mod_SLA_wl, "W. loxensis",color="#CD661D")
 
-(p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE)/
+fig <-(p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE)/
 (p1_Narea | p2_Narea | p3_Narea | p4_Narea | p5_Narea | p6_Narea) /
 (p1_Parea | p2_Parea | p3_Parea | p4_Parea | p5_Parea | p6_Parea) /
-
 (p1_SLA  | p2_SLA  | p3_SLA  | p4_SLA  | p5_SLA  | p6_SLA)
 
-
+ggsave(
+  "all_leaf_effects.png",
+  fig,
+  width = 18,
+  height = 20,
+  dpi = 300
+)
 ```
 
 
@@ -654,6 +672,152 @@ summary(imod_iwue_narea_we)
 
 #anova(mod1, mod2)
 ```
+### Estimated menas
+
+
+```{r Estimated Means}
+
+plots <- lapply(seq_along(models_iWUE), function(i){
+
+  emm <- emmeans(models_iWUE[[i]], ~ N*P)
+
+  row_id <- ceiling(i/6)
+
+  plot(emm, horizontal = FALSE) +
+    ggtitle(names(models_iWUE)[i]) +
+    theme_bw()
+})
+wrap_plots(plots, ncol = 6)
+
+```
+#Estimated menas graph
+
+```{r}
+library(emmeans)
+library(ggplot2)
+library(patchwork)
+library(ggthemes)
+
+sub_colors <- c(
+  "C"  = "grey40",
+  "N"  = "blue",
+  "P"  = "yellow",
+  "N:P" = "red"
+) 
+row_limits <- list(
+  c(10, 130),    # fila 1 = iWUE
+  c(-33, -23),   # fila 2 = δ13C
+  c(0.5, 0.95)   # fila 3 = Ci
+)
+
+
+row_limits_N <- list(
+  c(2, 3.5),    # fila 1 = iWUE
+  c(-1, 1),   # fila 2 = δ13C
+  c(0.8, 5),
+   c(3, 30) 
+)
+
+#models_iWUE 
+plots <- lapply(seq_along(models_N_graphic), function(i){
+
+  emm_df <- as.data.frame(
+    emmeans(models_N_graphic[[i]], ~ N*P)
+  )
+  
+ emm_df$Treatment <- with(
+  emm_df,
+  ifelse(N == 0 & P == 0, "C",
+  ifelse(N == 1 & P == 0, "N",
+  ifelse(N == 0 & P == 1, "P", "N:P")))
+)
+ 
+ emm_df$Treatment <- factor(
+  emm_df$Treatment,
+  levels = c("C", "N", "P", "N:P")
+)
+ 
+  # valor EMM del control
+  control_mean <- emm_df$emmean[emm_df$Treatment == "C"]
+ 
+  row_id <- ceiling(i/6)
+  first_col <- (i - 1) %% 6 == 0
+
+  p<- ggplot(
+    emm_df,
+    aes(
+      x = Treatment,
+      y = emmean,
+      color=Treatment
+    )
+  ) +
+
+    geom_hline(
+      yintercept = control_mean,
+      colour = "gray60",
+      linetype = "dashed",
+      linewidth = 0.6
+    ) +
+    geom_pointrange(
+      aes(
+        ymin = lower.CL,
+        ymax = upper.CL
+      )
+    ) +
+  scale_color_manual(values = sub_colors) +
+    coord_cartesian(
+      ylim = row_limits_N[[row_id]]
+    ) +
+    labs(
+      title = names(models_N_graphic)[i],
+      x = NULL,
+      y = NULL
+    ) +
+    theme_bw(base_size =14) +
+    theme(
+      plot.title = element_text(size = 8),
+      axis.text.x = element_text(angle = 45, hjust = 1))#,
+     # panel.grid.major = element_line(color = "gray60", linewidth = 0.4)#color de la grid
+    #)
+  
+  if(!first_col){
+
+  p <- p +
+    theme(
+      axis.text.y  = element_blank(),
+      axis.title.y = element_blank()
+    )
+
+  }
+  
+  p
+
+})
+
+final_plot <- wrap_plots(
+  plots,
+  ncol = 6,
+ nrow = 4, #######
+guides = "collect",
+) &
+theme(base_size = 14,
+  legend.position = "bottom",
+  plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "pt")
+) 
+
+
+
+ggsave(
+  "dummies_mod.png",
+  final_plot,
+  width = 18,
+  height = 12,
+  dpi = 300
+)
+
+final_plot
+```
+
 
 ```{r DHARMA diagnostics}
 # Run and plot

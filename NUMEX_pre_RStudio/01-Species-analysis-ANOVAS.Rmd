@@ -1,0 +1,165 @@
+---
+title: "Analisis ANOVAS en Controles para ver tendencias entre especies"
+author: "Andrea Chavez"
+date: "01-06-2026"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# PRELIMINAR ANALYSIS FOR NUMEX RESULTS.
+Here are the analysis at species level. 
+
+
+```{r libraries}
+library(dplyr)
+library(tidyverse)
+library(glmmTMB)
+library(DHARMa)
+library(ggplot2)
+library(scico)
+library(lmerTest)
+library(lme4)
+library(tables)
+library(flextable)
+library(readxl)
+library(modelsummary)
+library(knitr)
+library(patchwork)
+library("kableExtra")
+library("openxlsx")
+```
+
+```{r Data}
+getwd()
+
+data_for_R <- read_excel('data_for_R.xlsx')
+
+data= data_for_R
+```
+
+```{r transformando columnas}
+
+### nutrientes para ver cual funciona mejor.
+data$logNmass <- log(data$LNC) #
+data$logCmass <- log(data$LCC) #
+data$logPmass <- log(data$LPC) #
+
+
+data$SUB = data$Sub #porque abajo esta en mayuscula
+
+#solo dejar las necesarias
+data <- dplyr::select(data,
+        `name`,
+        `genus`,
+        `SUB`,#
+        `N`,
+        `P`,
+        `Bloque`,
+        `elevation_m`,
+    `iWUE (μmol/mol)`,
+    `δ18O in ‰ vs DeltaSMOW`,
+    `Specific leaf area (cm²/g)`,
+    `δ13C (‰ v.s.V-PDB)`,
+    `force to punch (kN/m)`, `Leaf area (cm²)`,`dry matter content (mg/g)`, `thickness (mm)`,`N:P`,`Ci/Ca`, Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area) 
+#Δ13C_cell
+```
+
+# ANOVA
+Tendencias generales
+
+
+
+```{r ANOVA }
+#global ANOVA for control
+controles <- data %>%
+  filter(SUB == "C")
+# Species order
+table(controles$name, controles$elevation_m)
+
+controles$elevation_m <- as.factor(controles$elevation_m)
+controles$name <- as.factor(controles$name)
+  
+#anova <- aov( `iWUE (μmol/mol)`~ elevation_m, data = controles)
+anova <- aov( `LNC`~ elevation_m, data = controles) #Uses all dataset. Interaction between species and treatment
+#Uses all dataset. Interaction between species and treatment
+summary(anova)
+
+TukeyHSD(anova, "elevation_m")
+
+shapiro.test(residuals(anova))
+```
+
+```{r ANOVA }
+
+library(multcompView)
+library(dplyr)
+shapiro.test(residuals(anova))
+tukey <- TukeyHSD(anova)
+
+# Orden deseado
+controles$name <- factor(
+  controles$name,
+  levels = c(
+    "Pouteria torta",
+    "Clarisia  racemosa",
+    "Myrcia sp nov",
+    "Alchornea lojaensis",
+    "Weinmania  loxensis",
+    "Hedyosmun  purpurascens"
+  )
+)
+
+
+anova <- aov(P_area ~ name, data = controles)
+
+tukey <- TukeyHSD(anova)
+
+letters <- multcompLetters4(anova, tukey)
+
+cld <- data.frame(
+  name = names(letters$name$Letters),
+  letra = letters$name$Letters
+)
+
+maximos <- controles %>%
+  group_by(name) %>%
+  summarise(y = max(P_area, na.rm = TRUE)) ###edy
+
+cld <- left_join(cld, maximos, by = "name")
+
+ggplot(controles, aes(x = name, y = P_area)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.15, alpha = 0.6, size = 2) +
+  geom_text(
+    data = cld,
+    aes(x = name, y = y + 0.3, label = letra),  # aumentar este valor
+    size = 5,
+    fontface = "bold"
+  ) +
+  theme_bw() +
+  labs(
+    x = "Species",
+    y = "LNC"
+  ) +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1,
+      face = "italic"
+    )
+  )
+```
+
+Resultados del ANOVA una sola via especie:
+### LNC 
+Between especies, especies at 1000 m, Clarisia and Pouteria are similar to each other (p-value = 0.20). Weinmania and Hedyosmum although being in the same elevation are different (p-value = 0.0007784). Myrcia and Alchornea are different too. (p=0.008). 
+### Narea. At mid elevation the highest Narea. High N levels at low levels are not being traslated into high Narea.Leaves are bigger at low elevations.At high elevations leaves are smaller but it is not traslated into bigger Narea.
+
+### iWUE
+Species at 1000 share similar iWUE. Myrcia and Alchornea are slightly different between them. Species at 2000 and 3000 are similar to each other.
+
+### LPC 
+Not pattern with elevation.P_area slightly higher at mid elevation with Alchornea taking up more. 
