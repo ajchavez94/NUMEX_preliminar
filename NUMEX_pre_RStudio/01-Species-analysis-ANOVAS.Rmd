@@ -112,8 +112,13 @@ controles$name <- factor(
   )
 )
 
+#controles <- controles %>%
+ # rename(N_P = `N:P`)
 
-anova <- aov(P_area ~ name, data = controles)
+controles <- controles %>%
+  rename(iWUE = `iWUE (μmol/mol)`)
+
+anova <- aov(iWUE ~ name, data = controles)
 
 tukey <- TukeyHSD(anova)
 
@@ -126,11 +131,11 @@ cld <- data.frame(
 
 maximos <- controles %>%
   group_by(name) %>%
-  summarise(y = max(P_area, na.rm = TRUE)) ###edy
+  summarise(y = max(iWUE, na.rm = TRUE)) ###edy
 
 cld <- left_join(cld, maximos, by = "name")
 
-ggplot(controles, aes(x = name, y = P_area)) +
+ggplot(controles, aes(x = name, y = iWUE)) +
   geom_boxplot() +
   geom_jitter(width = 0.15, alpha = 0.6, size = 2) +
   geom_text(
@@ -142,7 +147,7 @@ ggplot(controles, aes(x = name, y = P_area)) +
   theme_bw() +
   labs(
     x = "Species",
-    y = "LNC"
+    y = "iWUE"
   ) +
   theme(
     axis.text.x = element_text(
@@ -163,3 +168,109 @@ Species at 1000 share similar iWUE. Myrcia and Alchornea are slightly different 
 
 ### LPC 
 Not pattern with elevation.P_area slightly higher at mid elevation with Alchornea taking up more. 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(multcompView)
+library(patchwork)
+
+# Función para generar cada gráfico
+make_plot <- function(data, variable, ylab){
+
+  datos <- data %>%
+    rename(valor = all_of(variable))
+
+  anova <- aov(valor ~ name, data = datos)
+  tukey <- TukeyHSD(anova)
+
+  letters <- multcompLetters4(anova, tukey)
+
+  cld <- data.frame(
+    name = names(letters$name$Letters),
+    letra = letters$name$Letters
+  )
+
+  maximos <- datos %>%
+    group_by(name) %>%
+    summarise(y = max(valor, na.rm = TRUE),
+              .groups = "drop")
+
+  cld <- left_join(cld, maximos, by = "name")
+
+  ggplot(datos, aes(x = name, y = valor)) +
+    geom_boxplot() +
+    geom_jitter(width = 0.15, alpha = 0.6, size = 2) +
+    geom_text(
+      data = cld,
+      aes(x = name, y = y + 2.5, label = letra),
+      size = 3,
+      fontface = "bold"
+    ) +
+    theme_bw() +
+    labs(
+      x = NULL,
+      y = ylab
+    ) +
+    theme(
+      axis.text.x = element_text(
+        angle = 45,
+        hjust = 1,
+        face = "italic"
+      )
+    )
+}
+
+# Crear gráficos
+p1 <- make_plot(controles, "iWUE", "iWUE (µmol mol⁻¹)")
+p2 <- make_plot(controles, "N_P", "N:P")
+p3 <- make_plot(controles, "LNC", "Leaf N (mg/g)")
+p4 <- make_plot(controles, "LPC", "Leaf P (mg/g)")
+
+p1 <- p1 +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+p2 <- p2 +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+
+((p1 + p2) /
+ (p3 + p4)) +plot_annotation(tag_levels = "A")
+```
+
+
+```{r}
+
+library(tidyr)
+library(ggplot2)
+
+datos_long <- controles %>%
+  select(name, iWUE, N_P, LNC, LPC) %>%
+  pivot_longer(
+    cols = c(iWUE, N_P, LNC, LPC),
+    names_to = "Variable",
+    values_to = "Valor"
+  )
+
+ggplot(datos_long, aes(name, Valor)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.15, alpha = 0.6) +
+  facet_wrap(~ Variable, ncol = 2, scales = "free_y") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1,
+      face = "italic"
+    )
+  ) +
+  labs(x = "Species", y = NULL)
+```
+

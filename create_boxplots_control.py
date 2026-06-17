@@ -24,7 +24,7 @@ def create_boxplots_control(var, data):
         value_name="valor"
     )
 
-    orden = ["C", "N", "NP","P"]
+    orden = ["C", "N", "P","NP"]
     df_long["Sub"] = pd.Categorical(df_long["Sub"], categories=orden, ordered=True)
 
     altitud_map = {
@@ -64,10 +64,10 @@ def create_boxplots_control(var, data):
     # Color palette
     # -----------------------------
     palette_Sub = {
-        "C": "#A3A3A3",
+        "C": "#F5ECEC",
         "N": "#4619eb",
-        "P": "#FFFC40FF",
-        "NP": "#ff2b47",
+        "P": "#F55757FF",
+        "NP": "#7A7676",
     }
 
     sns.set(style="whitegrid")
@@ -85,31 +85,34 @@ def create_boxplots_control(var, data):
         ax = axes[i]
         subdf = df_long[df_long["name"] == sp]
 
-        sns.violinplot(data=subdf, x="Sub", y="valor", inner_kws=dict(box_width=6, whis_width=1, color="0.5"),fill=False,ax=ax)
+        #sns.violinplot(data=subdf, x="Sub", y="valor", inner_kws=dict(box_width=6, whis_width=1, color="0.5"),fill=False,ax=ax)
 
-        #sns.boxplot(
-        #    data=subdf,
-       #     x="Sub", y="valor",
-       #     #palette=palette_Sub,
-          #  color=".9", 
-          #  linecolor="black", linewidth=.85,
-          #  showmeans=True,
-        #    meanprops={"marker": "s",
-        #               "markerfacecolor": "black",
-        #                "markeredgecolor":"black",
-        #               "markersize": "4"},
-       #     width = 0.65,
-      #      ax=ax
-      #  )
+        sns.boxplot(
+            data=subdf,
+           x="Sub", y="valor",
+           #palette=palette_Sub,
+            color=".9", 
+            linecolor="black", linewidth=.85,
+            showmeans=True,
+          meanprops={"marker": "s",
+                      "markerfacecolor": "black",
+                       "markeredgecolor":"black",
+                      "markersize": "4"},
+           width = 0.65,
+           fliersize=0,
+           ax=ax
+        )
 
         sns.swarmplot(
             data=subdf,
             x="Sub", y="valor",
             palette=palette_Sub,
-            color="grey",
+            #color="#474646",
+            linewidth=1,edgecolor='gray',
             dodge=False,
+            size=5,
             ax=ax,
-            alpha=0.9
+
         )
 
 

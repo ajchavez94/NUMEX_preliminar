@@ -530,6 +530,23 @@ mod_Tough_my <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_m
 mod_Tough_hp <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_hp)
 mod_Tough_wl <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
 
+
+
+mod_la_pt <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
+mod_la_cr <- lmer(`LA`~ N*P+ (1 | Bloque), data = datos_Clarisia)
+mod_la_al <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_al)
+mod_la_my <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_myrcia)
+mod_la_hp <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_hp)
+mod_la_wl <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
+
+
+mod_dmc_pt <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
+mod_dmc_cr <- lmer(`dry matter content (mg/g)`~ N*P+ (1 | Bloque), data = datos_Clarisia)
+mod_dmc_al <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_al)
+mod_dmc_my <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
+mod_dmc_hp <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_hp)
+mod_dmc_wl <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
+
 ```
 
 ```{r listado morpho}
@@ -558,7 +575,24 @@ models_leaf <- list(
 "Toughness | 2000 | Alchornea" = mod_Tough_al,
 "Toughness | 2000 | Myrcia" = mod_Tough_my,
 "Toughness | 3000 | Hedyosmum" = mod_Tough_hp,
-"Toughness | 3000 | Weinmannia" = mod_Tough_wl
+"Toughness | 3000 | Weinmannia" = mod_Tough_wl,
+
+# Le
+"LA | 1000 | Pouteria" = mod_la_pt,
+"LA | 1000 | Clarisia" = mod_la_cr,
+"LA | 2000 | Alchornea" = mod_la_al,
+"LA| 2000 | Myrcia" = mod_la_my,
+"LA | 3000 | Hedyosmum" = mod_la_hp,
+"LA | 3000 | Weinmannia" = mod_la_wl,
+
+# DMC
+"DMC | 1000 | Pouteria" = mod_dmc_pt,
+"DMC | 1000 | Clarisia" = mod_dmc_cr,
+"DMC | 2000 | Alchornea" = mod_dmc_al,
+"DMC 2000 | Myrcia" = mod_dmc_my,
+"DMC | 3000 | Hedyosmum" = mod_dmc_hp,
+"DMC | 3000 | Weinmannia" = mod_dmc_wl
+
 )
 ```
 
@@ -699,30 +733,31 @@ library(patchwork)
 library(ggthemes)
 
 sub_colors <- c(
-  "C"  = "grey40",
-  "N"  = "blue",
-  "P"  = "yellow",
-  "N:P" = "red"
+  "C"  = "white",
+  "N"  = "red",
+  "P"  = "blue",
+  "N:P" = "gray60"
 ) 
+
 row_limits <- list(
-  c(10, 130),    # fila 1 = iWUE
-  c(-33, -23),   # fila 2 = δ13C
-  c(0.5, 0.95)   # fila 3 = Ci
+  c(0, 130),    # fila 1 = iWUE
+  c(-35, -23),   # fila 2 = δ13C
+  c(0.5, 1.3)   # fila 3 = Ci
 )
 
 
 row_limits_N <- list(
   c(2, 3.5),    # fila 1 = iWUE
   c(-1, 1),   # fila 2 = δ13C
-  c(0.8, 5),
+  c(0.8, 4.3),
    c(3, 30) 
 )
 
-#models_iWUE 
-plots <- lapply(seq_along(models_N_graphic), function(i){
+#models_iWUE models_N_graphic
+plots <- lapply(seq_along(models_iWUE), function(i){
 
   emm_df <- as.data.frame(
-    emmeans(models_N_graphic[[i]], ~ N*P)
+    emmeans(models_iWUE[[i]], ~ N*P)
   )
   
  emm_df$Treatment <- with(
@@ -748,9 +783,21 @@ plots <- lapply(seq_along(models_N_graphic), function(i){
     aes(
       x = Treatment,
       y = emmean,
-      color=Treatment
+      colour = Treatment
     )
   ) +
+  geom_linerange(
+    aes(ymin = lower.CL, ymax = upper.CL),
+    width = 0.10,
+    colour = "black"
+  ) +
+  geom_point(
+    fill= sub_colors,
+    shape = 21,
+    size = 4,
+    alpha = 0.95,
+    color = "black"
+  )+
 
     geom_hline(
       yintercept = control_mean,
@@ -758,18 +805,13 @@ plots <- lapply(seq_along(models_N_graphic), function(i){
       linetype = "dashed",
       linewidth = 0.6
     ) +
-    geom_pointrange(
-      aes(
-        ymin = lower.CL,
-        ymax = upper.CL
-      )
-    ) +
+
   scale_color_manual(values = sub_colors) +
     coord_cartesian(
-      ylim = row_limits_N[[row_id]]
+      ylim = row_limits[[row_id]]
     ) +
     labs(
-      title = names(models_N_graphic)[i],
+      title = names(models_iWUE)[i],
       x = NULL,
       y = NULL
     ) +
@@ -777,7 +819,7 @@ plots <- lapply(seq_along(models_N_graphic), function(i){
     theme(
       plot.title = element_text(size = 8),
       axis.text.x = element_text(angle = 45, hjust = 1))#,
-     # panel.grid.major = element_line(color = "gray60", linewidth = 0.4)#color de la grid
+      panel.grid.major = element_line(color = "gray60", linewidth = 0.1)#color de la grid
     #)
   
   if(!first_col){
@@ -810,8 +852,8 @@ theme(base_size = 14,
 ggsave(
   "dummies_mod.png",
   final_plot,
-  width = 18,
-  height = 12,
+  width = 12,
+  height = 10,
   dpi = 300
 )
 
