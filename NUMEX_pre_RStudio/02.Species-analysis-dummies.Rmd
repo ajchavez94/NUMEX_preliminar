@@ -30,6 +30,9 @@ library(knitr)
 library(patchwork)
 library("kableExtra")
 library("openxlsx")
+library(emmeans)
+library(patchwork)
+library(ggthemes)
 ```
 
 ```{r Data}
@@ -727,10 +730,7 @@ wrap_plots(plots, ncol = 6)
 #Estimated menas graph
 
 ```{r}
-library(emmeans)
-library(ggplot2)
-library(patchwork)
-library(ggthemes)
+
 
 sub_colors <- c(
   "C"  = "white",
@@ -747,17 +747,25 @@ row_limits <- list(
 
 
 row_limits_N <- list(
-  c(2, 3.5),    # fila 1 = iWUE
+  c(2.8, 3.5),    # fila 1 = iWUE
   c(-1, 1),   # fila 2 = δ13C
   c(0.8, 4.3),
    c(3, 30) 
 )
 
-#models_iWUE models_N_graphic
-plots <- lapply(seq_along(models_iWUE), function(i){
+
+row_limits_morpho <- list(
+  c(20, 140),    # fila 1 = iWUE
+  c(-0.1, 0.9),   # fila 2 = δ13C
+  c(0.5, 2.3),
+   c(-10, 90),
+  c(-100, 100)
+)
+#models_iWUE models_N_graphic models_leaf
+plots <- lapply(seq_along(models_leaf), function(i){
 
   emm_df <- as.data.frame(
-    emmeans(models_iWUE[[i]], ~ N*P)
+    emmeans(models_leaf[[i]], ~ N*P)
   )
   
  emm_df$Treatment <- with(
@@ -808,10 +816,10 @@ plots <- lapply(seq_along(models_iWUE), function(i){
 
   scale_color_manual(values = sub_colors) +
     coord_cartesian(
-      ylim = row_limits[[row_id]]
+      ylim = row_limits_morpho[[row_id]]
     ) +
     labs(
-      title = names(models_iWUE)[i],
+      title = names(models_leaf)[i],
       x = NULL,
       y = NULL
     ) +
@@ -839,7 +847,7 @@ plots <- lapply(seq_along(models_iWUE), function(i){
 final_plot <- wrap_plots(
   plots,
   ncol = 6,
- nrow = 4, #######
+ nrow = 6, #######
 guides = "collect",
 ) &
 theme(base_size = 14,

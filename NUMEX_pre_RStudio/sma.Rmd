@@ -134,6 +134,9 @@ ggsave(
   dpi = 300
 )
 ```
+```{r}
+
+```
 
 ```{r}
 library(smatr)
@@ -214,6 +217,75 @@ summary(sma5)
 
 sma6 <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_Weinmania)
 summary(sma6)
+```
+```{r}
+ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
+  
+  geom_point(aes(fill= Treatment),
+             shape = 21,
+             color="black",
+             size = 1.5) +#aes(shape = SUB), size = 3
+  stat_ma_line(method = "SMA",color="black",linewidth = 0.5) +
+  stat_ma_eq(
+    method = "SMA",
+    mapping = use_label("eq", "R2"),
+    size =1.8,
+  ) +
+ scale_fill_manual(
+    values = sub_colors)+
+  facet_wrap(~name,nrow = 1)  +
+  labs(
+    x = "Parea",
+    y = "iWUE (μmol/mol)",
+  ) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(
+      size = 7,
+      face = "italic")
+  )
+
+ggsave(
+  "Parea_iWUE_SMA.png",
+  width = 180,      # mm
+  height = 70,      # mm
+  units = "mm",
+  dpi = 300
+)
+```
+
+```{r}
+ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
+  
+  geom_point(aes(fill= Treatment),
+             shape = 21,
+             color="black",
+             size = 1.5) +#aes(shape = SUB), size = 3
+  stat_ma_line(method = "SMA",color="black",linewidth = 0.5) +
+  stat_ma_eq(
+    method = "SMA",
+    mapping = use_label("eq", "R2"),
+    size =1.8,
+  ) +
+ scale_fill_manual(
+    values = sub_colors)+
+  facet_wrap(~name,nrow = 1)  +
+  labs(
+    x = "Parea",
+    y = "iWUE (μmol/mol)",
+  ) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(
+      size = 7,
+      face = "italic")
+  )
+
+ggsave(
+  "Xtrait_iWUE_SMA.png",
+  width = 180,      # mm
+  height = 70,      # mm
+  units = "mm",
+  dpi = 300
+)
 ```
 
 
