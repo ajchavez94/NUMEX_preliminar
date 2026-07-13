@@ -134,10 +134,12 @@ tabla <- function(model_list) {
 
   tab <- modelsummary(
     model_list,
-    output = "data.frame",
-    statistics = TRUE,
-    stars = TRUE,
-    gof_map = c("nobs", "r2.marginal", "r2.conditional", "aic")
+    output    = "data.frame",
+    estimate  = "{estimate}{stars} (SE = {std.error}, p = {p.value})",  # 👈 aquí va todo junto
+    statistic = NULL,                                                   # 👈 ya no hace falta línea aparte
+    stars     = TRUE,                                                   # necesario para que {stars} se resuelva
+    fmt       = 2,                                                      # opcional: controla decimales
+    gof_map   = c("nobs", "r2.marginal", "r2.conditional", "aic")
   )
 
   # Transponer
@@ -196,7 +198,95 @@ filter(data$genus == "Weinmania")
 #  c(-33,-23),
 #  c(0.5,0.95)
 #)
+```
+```{r}
+mod_iWUE_pt_sin <- lmer(`iWUE (μmol/mol)` ~ N+P+ (1 | Bloque) , data = datos_Pouteria)# 
+mod_iWUE_cr_sin <- lmer(`iWUE (μmol/mol)` ~ N+P+ (1 | Bloque) , data = datos_Clarisia)#is Singular
+mod_iWUE_al_sin <- lmer(`iWUE (μmol/mol)` ~ N+P + (1 | Bloque), data = datos_al)
+mod_iWUE_my_sin <- lmer(`iWUE (μmol/mol)` ~ N+P + (1 | Bloque), data = datos_myrcia)#isSingular
+mod_iWUE_hp_sin <- lmer(`iWUE (μmol/mol)` ~ N+P+ (1 | Bloque), data = datos_hp) #isSingular
+mod_iWUE_wl_sin <- lmer(`iWUE (μmol/mol)` ~ N+P + (1 | Bloque), data = datos_Weinmania)
 
+summary(mod_iWUE_pt_sin)
+summary(mod_iWUE_cr_sin)
+summary(mod_iWUE_al_sin)
+summary(mod_iWUE_my_sin)
+summary(mod_iWUE_hp_sin)
+summary(mod_iWUE_wl_sin)
+
+```
+```{r}
+m1 <- lmer(`iWUE (μmol/mol)` ~ N + P + (1|Bloque),
+           data = datos_Pouteria,
+           REML = FALSE)
+
+m2 <- lmer(`iWUE (μmol/mol)` ~ N*P + (1|Bloque),
+           data = datos_Pouteria,
+           REML = FALSE)
+
+AIC(m1, m2)
+anova(m1, m2)
+
+
+m1 <- lmer(`iWUE (μmol/mol)` ~ N + P + (1|Bloque),
+           data = datos_Clarisia,
+           REML = FALSE)
+
+m2 <- lmer(`iWUE (μmol/mol)` ~ N*P + (1|Bloque),
+           data = datos_Clarisia,
+           REML = FALSE)
+
+AIC(m1, m2)
+anova(m1, m2)
+
+m1 <- lmer(`iWUE (μmol/mol)` ~ N + P + (1|Bloque),
+           data = datos_al,
+           REML = FALSE)
+
+m2 <- lmer(`iWUE (μmol/mol)` ~ N*P + (1|Bloque),
+           data = datos_al,
+           REML = FALSE)
+
+AIC(m1, m2)
+anova(m1, m2)
+
+m1 <- lmer(`iWUE (μmol/mol)` ~ N + P + (1|Bloque),
+           data = datos_myrcia,
+           REML = FALSE)
+
+m2 <- lmer(`iWUE (μmol/mol)` ~ N*P + (1|Bloque),
+           data = datos_myrcia,
+           REML = FALSE)
+
+AIC(m1, m2)
+anova(m1, m2)
+
+m1 <- lmer(`iWUE (μmol/mol)` ~ N + P + (1|Bloque),
+           data = datos_hp,
+           REML = FALSE)
+
+m2 <- lmer(`iWUE (μmol/mol)` ~ N*P + (1|Bloque),
+           data = datos_hp,
+           REML = FALSE)
+
+AIC(m1, m2)
+anova(m1, m2)
+
+
+m1 <- lmer(`iWUE (μmol/mol)` ~ N + P + (1|Bloque),
+           data = datos_Weinmania,
+           REML = FALSE)
+
+m2 <- lmer(`iWUE (μmol/mol)` ~ N*P + (1|Bloque),
+           data = datos_Weinmania,
+           REML = FALSE)
+
+AIC(m1, m2)
+anova(m1, m2)
+```
+
+
+```{r Modelos sin interaccion }
 mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ N*P+ (1 | Bloque) , data = datos_Pouteria)# 
 mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ N*P+ (1 | Bloque) , data = datos_Clarisia)#is Singular
 mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ N*P + (1 | Bloque), data = datos_al)
@@ -235,6 +325,8 @@ mod_Ci_my <- lmer(`Ci/Ca`~ N*P + (1 | Bloque), data = datos_myrcia)
 mod_Ci_hp <- lmer(`Ci/Ca`~ N*P + (1 | Bloque), data = datos_hp)
 mod_Ci_wl <- lmer(`Ci/Ca` ~ N*P + (1 | Bloque), data = datos_Weinmania)
 ```
+
+
 ```{r listado}
 #source("tabla_SUB.R")
 
@@ -369,8 +461,172 @@ mod_fol_NP_my <- lmer(`N:P` ~ N*P + (1 | Bloque), data = datos_myrcia)
 mod_fol_NP_hp <- lmer(`N:P` ~ N*P + (1 | Bloque), data = datos_hp)
 mod_fol_NP_wl <- lmer(`N:P` ~ N*P + (1 | Bloque), data = datos_Weinmania)
 
+summary(mod_logCmass_pt)
+summary(mod_logCmass_cr)
+summary(mod_logCmass_al)
+summary(mod_logCmass_my)
+summary(mod_logCmass_hp)
+summary(mod_logCmass_wl)
+
+summary(mod_logNmass_pt)
+summary(mod_logNmass_cr)
+summary(mod_logNmass_al)
+summary(mod_logNmass_my)
+summary(mod_logNmass_hp)
+summary(mod_logNmass_wl)
+
+summary(mod_logPmass_pt)
+summary(mod_logPmass_cr)
+summary(mod_logPmass_al)
+summary(mod_logPmass_my)
+summary(mod_logPmass_hp)
+summary(mod_logPmass_wl)
+
+summary(mod_Narea_pt)
+summary(mod_Narea_cr)
+summary(mod_Narea_al)
+summary(mod_Narea_my)
+summary(mod_Narea_hp)
+summary(mod_Narea_wl)
+
 ```
+```{r}
+###### NITROGEN ############
+mod_Nmass_pt <- lmer(LNC ~ N+P+ (1 | Bloque), data = datos_Pouteria)
+mod_Nmass_cr <- lmer(LNC ~ N+P+ (1 | Bloque), data = datos_Clarisia)
+mod_Nmass_my <- lmer(LNC ~ N+P+ (1 | Bloque), data = datos_myrcia)
+mod_Nmass_al <- lmer(LNC ~ N+P+ (1 | Bloque), data = datos_al)
+mod_Nmass_wl <- lmer(LNC ~ N+P+ (1 | Bloque), data = datos_Weinmania)
+mod_Nmass_hp <- lmer(LNC ~ N+P+ (1 | Bloque), data = datos_hp)
+
+######## PHOSPHORUS ############
+mod_Pmass_pt <- lmer(LPC ~ N+P+ (1 | Bloque), data = datos_Pouteria)
+mod_Pmass_cr <- lmer(LPC ~ N+P+ (1 | Bloque), data = datos_Clarisia)
+mod_Pmass_my <- lmer(LPC ~ N+P+ (1 | Bloque), data = datos_myrcia)
+mod_Pmass_al <- lmer(LPC ~ N+P+ (1 | Bloque), data = datos_al)
+mod_Pmass_wl <- lmer(LPC ~ N+P+ (1 | Bloque), data = datos_Weinmania)
+mod_Pmass_hp <- lmer(LPC ~ N+P+ (1 | Bloque), data = datos_hp)
+
+########## CARBON ################
+mod_Cmass_pt <- lmer(LCC ~ N+P + (1 | Bloque), data = datos_Pouteria)
+mod_Cmass_cr <- lmer(LCC ~ N+P + (1 | Bloque), data = datos_Clarisia)
+mod_Cmass_al <- lmer(LCC ~ N+P + (1 | Bloque), data = datos_al)
+mod_Cmass_my <- lmer(LCC ~ N+P + (1 | Bloque), data = datos_myrcia)
+mod_Cmass_hp <- lmer(LCC ~ N+P + (1 | Bloque), data = datos_hp)
+mod_Cmass_wl <- lmer(LCC ~ N+P + (1 | Bloque), data = datos_Weinmania)
+
+mod_logNmass_pt <- lmer(`logNmass` ~ N+P+ (1 | Bloque), data = datos_Pouteria)
+mod_logNmass_cr <- lmer(`logNmass` ~ N+P+ (1 | Bloque), data = datos_Clarisia)
+mod_logNmass_my <- lmer(`logNmass` ~ N+P+ (1 | Bloque), data = datos_myrcia)
+mod_logNmass_al <- lmer(`logNmass` ~ N+P+ (1 | Bloque), data = datos_al)
+mod_logNmass_wl <- lmer(`logNmass` ~ N+P+ (1 | Bloque), data = datos_Weinmania)
+mod_logNmass_hp <- lmer(`logNmass` ~ N+P+ (1 | Bloque), data = datos_hp)
+
+mod_logPmass_pt <- lmer(`logPmass` ~ N+P+ (1 | Bloque), data = datos_Pouteria)
+mod_logPmass_cr <- lmer(`logPmass` ~ N+P+ (1 | Bloque), data = datos_Clarisia)
+mod_logPmass_my <- lmer(`logPmass` ~ N+P+ (1 | Bloque), data = datos_myrcia)
+mod_logPmass_al <- lmer(`logPmass` ~ N+P+ (1 | Bloque), data = datos_al)
+mod_logPmass_wl <- lmer(`logPmass` ~ N+P+ (1 | Bloque), data = datos_Weinmania)
+mod_logPmass_hp <- lmer(`logPmass` ~ N+P+ (1 | Bloque), data = datos_hp)
+
+mod_logCmass_pt <- lmer(`logCmass` ~ N+P+ (1 | Bloque), data = datos_Pouteria)
+mod_logCmass_cr <- lmer(`logCmass` ~ N+P+ (1 | Bloque), data = datos_Clarisia)
+mod_logCmass_my <- lmer(`logCmass` ~ N+P+ (1 | Bloque), data = datos_myrcia)
+mod_logCmass_al <- lmer(`logCmass` ~ N+P+ (1 | Bloque), data = datos_al)
+mod_logCmass_wl <- lmer(`logCmass` ~ N+P+ (1 | Bloque), data = datos_Weinmania)
+mod_logCmass_hp <- lmer(`logCmass` ~ N+P+ (1 | Bloque), data = datos_hp)
+
+mod_Narea_pt <- lmer(`N_area` ~ N+P+ (1 | Bloque), data = datos_Pouteria)
+mod_Narea_cr <- lmer(`N_area` ~ N+P+ (1 | Bloque), data = datos_Clarisia)
+mod_Narea_my <- lmer(`N_area` ~ N+P+ (1 | Bloque), data = datos_myrcia)
+mod_Narea_wl <- lmer(`N_area` ~ N+P+ (1 | Bloque), data = datos_Weinmania)
+mod_Narea_al <- lmer(`N_area` ~ N+P+ (1 | Bloque), data = datos_al)
+mod_Narea_hp <- lmer(`N_area` ~ N+P+ (1 | Bloque), data = datos_hp)
+
+######## PHOSPHORUS ############
+mod_Parea_pt <- lmer(`P_area` ~ N+P+ (1 | Bloque), data = datos_Pouteria)
+mod_Parea_cr <- lmer(`P_area` ~ N+P+ (1 | Bloque), data = datos_Clarisia)
+mod_Parea_my <- lmer(`P_area` ~ N+P+ (1 | Bloque), data = datos_myrcia)
+mod_Parea_wl <- lmer(`P_area` ~ N+P+ (1 | Bloque), data = datos_Weinmania)
+mod_Parea_al <- lmer(`P_area` ~ N+P+ (1 | Bloque), data = datos_al)
+mod_Parea_hp <- lmer(`P_area` ~ N+P+ (1 | Bloque), data = datos_hp)
+
+########## CARBON ################
+mod_Carea_pt <- lmer(C_area ~ N+P + (1 | Bloque), data = datos_Pouteria)
+mod_Carea_cr <- lmer(C_area ~ N+P + (1 | Bloque), data = datos_Clarisia)
+mod_Carea_al <- lmer(C_area ~ N+P + (1 | Bloque), data = datos_al)
+mod_Carea_my <- lmer(C_area ~ N+P + (1 | Bloque), data = datos_myrcia)
+mod_Carea_hp <- lmer(C_area ~ N+P + (1 | Bloque), data = datos_hp)
+mod_Carea_wl <- lmer(C_area ~ N+P + (1 | Bloque), data = datos_Weinmania)
+
+mod_fol_NP_pt <- lmer(`N:P` ~ N+P + (1 | Bloque), data = datos_Pouteria)
+mod_fol_NP_cr <- lmer(`N:P` ~ N+P + (1 | Bloque), data = datos_Clarisia)
+mod_fol_NP_al <- lmer(`N:P` ~ N+P + (1 | Bloque), data = datos_al)
+mod_fol_NP_my <- lmer(`N:P` ~ N+P + (1 | Bloque), data = datos_myrcia)
+mod_fol_NP_hp <- lmer(`N:P` ~ N+P + (1 | Bloque), data = datos_hp)
+mod_fol_NP_wl <- lmer(`N:P` ~ N+P + (1 | Bloque), data = datos_Weinmania)
+
+summary(mod_logCmass_pt)
+summary(mod_logCmass_cr)
+summary(mod_logCmass_al)
+summary(mod_logCmass_my)
+summary(mod_logCmass_hp)
+summary(mod_logCmass_wl)
+
+summary(mod_logNmass_pt)
+summary(mod_logNmass_cr)
+summary(mod_logNmass_al)
+summary(mod_logNmass_my)
+summary(mod_logNmass_hp)
+summary(mod_logNmass_wl)
+
+summary(mod_logPmass_pt)
+summary(mod_logPmass_cr)
+summary(mod_logPmass_al)
+summary(mod_logPmass_my)
+summary(mod_logPmass_hp)
+summary(mod_logPmass_wl)
+
+summary(mod_Narea_pt)
+summary(mod_Narea_cr)
+summary(mod_Narea_al)
+summary(mod_Narea_my)
+summary(mod_Narea_hp)
+summary(mod_Narea_wl)
+```
+```{r}
+summary(mod_logCmass_pt)
+summary(mod_logCmass_cr)
+summary(mod_logCmass_al)
+summary(mod_logCmass_my)
+summary(mod_logCmass_hp)
+summary(mod_logCmass_wl)
+
+summary(mod_logNmass_pt)
+summary(mod_logNmass_cr)
+summary(mod_logNmass_al)
+summary(mod_logNmass_my)
+summary(mod_logNmass_hp)
+summary(mod_logNmass_wl)
+
+summary(mod_logPmass_pt)
+summary(mod_logPmass_cr)
+summary(mod_logPmass_al)
+summary(mod_logPmass_my)
+summary(mod_logPmass_hp)
+summary(mod_logPmass_wl)
+
+summary(mod_Narea_pt)
+summary(mod_Narea_cr)
+summary(mod_Narea_al)
+summary(mod_Narea_my)
+summary(mod_Narea_hp)
+summary(mod_Narea_wl)
+
+```
+
 ```{r estq}
+
 
 models_est <- list(
 # Nmass
@@ -512,6 +768,8 @@ for (name in names(models_est)) {
 #3. MORPHOLOGICAL
 
 ```{r morpho}
+
+
 mod_SLA_pt <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
 mod_SLA_cr <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Clarisia)
 mod_SLA_al <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_al)
@@ -727,7 +985,76 @@ plots <- lapply(seq_along(models_iWUE), function(i){
 wrap_plots(plots, ncol = 6)
 
 ```
-#Estimated menas graph
+```{r}
+main_figure <- list(
+
+# SLA
+"iWUE | 1000 | Pouteria" = mod_iWUE_pt,
+"iWUE | 1000 | Clarisia" = mod_iWUE_cr,
+"iWUE | 2000 | Alchornea" = mod_iWUE_al,
+"iWUE | 2000 | Myrcia" = mod_iWUE_my,
+"iWUE | 3000 | Hedyosmum" = mod_iWUE_hp,
+"iWUE | 3000 | Weinmannia" = mod_iWUE_wl,
+
+"logLNC | 1000 | Pouteria" = mod_logNmass_pt,
+"logLNC | 1000 | Clarisia" = mod_logNmass_cr,
+"logLNC | 2000 | Alchornea" = mod_logNmass_al,
+"logLNC | 2000 | Myrcia" = mod_logNmass_my,
+"logLNC | 3000 | Hedyosmum" = mod_logNmass_hp,
+"logLNC | 3000 | Weinmannia" = mod_logNmass_wl,
+
+# Narea
+"Narea | 1000 | Pouteria" = mod_Narea_pt,
+"Narea | 1000 | Clarisia" = mod_Narea_cr,
+"Narea | 2000 | Alchornea" = mod_Narea_al,
+"Narea | 2000 | Myrcia" = mod_Narea_my,
+"Narea | 3000 | Hedyosmum" = mod_Narea_hp,
+"Narea | 3000 | Weinmannia" = mod_Narea_wl,
+
+"logLPC | 1000 | Pouteria" = mod_logPmass_pt,
+"logLPC | 1000 | Clarisia" = mod_logPmass_cr,
+"logLPC | 2000 | Alchornea" = mod_logPmass_al,
+"logLPC | 2000 | Myrcia" = mod_logPmass_my,
+"logLPC | 3000 | Hedyosmum" = mod_logPmass_hp,
+"logLPC | 3000 | Weinmannia" = mod_logPmass_wl,
+
+# Carea
+"Parea | 1000 | Pouteria" = mod_Parea_pt,
+"Parea | 1000 | Clarisia" = mod_Parea_cr,
+"Parea | 2000 | Alchornea" = mod_Parea_al,
+"Parea | 2000 | Myrcia" = mod_Parea_my,
+"Parea | 3000 | Hedyosmum" = mod_Parea_hp,
+"Parea | 3000 | Weinmannia" = mod_Parea_wl,
+
+"Leaf N:P | 1000 | Pouteria" = mod_fol_NP_pt,
+"Leaf N:P | 1000 | Clarisia" = mod_fol_NP_cr,
+"Leaf N:P | 2000 | Alchornea" = mod_fol_NP_al,
+"Leaf N:P | 2000 | Myrcia" = mod_fol_NP_my,
+"Leaf N:P | 3000 | Hedyosmum" = mod_fol_NP_hp,
+"Leaf N:P | 3000 | Weinmannia" = mod_fol_NP_wl,
+
+# SLA
+"SLA | 1000 | Pouteria" = mod_SLA_pt,
+"SLA | 1000 | Clarisia" = mod_SLA_cr,
+"SLA | 2000 | Alchornea" = mod_SLA_al,
+"SLA | 2000 | Myrcia" = mod_SLA_my,
+"SLA | 3000 | Hedyosmum" = mod_SLA_hp,
+"SLA | 3000 | Weinmannia" = mod_SLA_wl
+
+)
+
+limits_main <- list(
+  c(0, 130),    # fila 1 = iWUE
+  c(1.5, 3.5),   # loglNC
+  c(1.5, 4),   # Narea
+  c(-0.5, 1),  #logLPC
+  c(0, 5),     #ärea
+  c(0, 30),  
+  c(0, 150) #0
+)
+
+```
+
 
 ```{r}
 
@@ -762,10 +1089,10 @@ row_limits_morpho <- list(
   c(-100, 100)
 )
 #models_iWUE models_N_graphic models_leaf
-plots <- lapply(seq_along(models_leaf), function(i){
+plots <- lapply(seq_along(main_figure), function(i){
 
   emm_df <- as.data.frame(
-    emmeans(models_leaf[[i]], ~ N*P)
+    emmeans(main_figure[[i]], ~ N*P)
   )
   
  emm_df$Treatment <- with(
@@ -800,7 +1127,7 @@ plots <- lapply(seq_along(models_leaf), function(i){
     colour = "black"
   ) +
   geom_point(
-    fill= sub_colors,
+    aes(fill = Treatment), #fill= sub_colors,
     shape = 21,
     size = 4,
     alpha = 0.95,
@@ -814,12 +1141,12 @@ plots <- lapply(seq_along(models_leaf), function(i){
       linewidth = 0.6
     ) +
 
-  scale_color_manual(values = sub_colors) +
+  scale_fill_manual(values = sub_colors) +
     coord_cartesian(
-      ylim = row_limits_morpho[[row_id]]
+      ylim = limits_main[[row_id]]
     ) +
     labs(
-      title = names(models_leaf)[i],
+      title = names(main_figure)[i],
       x = NULL,
       y = NULL
     ) +
@@ -847,7 +1174,7 @@ plots <- lapply(seq_along(models_leaf), function(i){
 final_plot <- wrap_plots(
   plots,
   ncol = 6,
- nrow = 6, #######
+ nrow = 7, #######
 guides = "collect",
 ) &
 theme(base_size = 14,
