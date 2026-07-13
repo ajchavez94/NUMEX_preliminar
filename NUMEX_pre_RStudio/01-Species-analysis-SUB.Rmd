@@ -63,7 +63,7 @@ data <- dplyr::select(data,
     `δ18O in ‰ vs DeltaSMOW`,
     `Specific leaf area (cm²/g)`,
     `δ13C (‰ v.s.V-PDB)`,
-    `force to punch (kN/m)`, `Leaf area (cm²)`,`dry matter content (mg/g)`, `thickness (mm)`,`N:P`,`Ci/Ca`, Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area,LA) 
+    `force to punch (kN/m)`, `Leaf area (cm²)`,`dry matter content (mg/g)`, `thickness (mm)`,`N:P`,`Ci/Ca`, Ci,LNC,LPC,LCC,logNmass,logCmass,logPmass,P_area,N_area,C_area,LA,`LMA g/m2`) 
 #Δ13C_cell
 ```
 
@@ -181,7 +181,7 @@ tabla <- function(model_list) {
 
 # 1. ISOTOPOS
 
-```{r Modelos sin interaccion }
+```{r Filtrando por especie }
 datos_Pouteria <- data %>%
 filter(data$genus == "Pouteria")
 
@@ -198,7 +198,10 @@ datos_hp <- data %>%
 filter(data$genus == "Hedyosmun")
 datos_Weinmania <- data %>%
 filter(data$genus == "Weinmania")
+```
 
+
+```{r Modelos sin interaccion }
 ## IWUE
 
 mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ SUB + (1 | Bloque), data = datos_Pouteria)# is Singular 
@@ -506,6 +509,12 @@ mod_SLA_al <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = dat
 mod_SLA_my <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_myrcia)
 mod_SLA_hp <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_hp)
 mod_SLA_wl <- lmer(`Specific leaf area (cm²/g)` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+summary(mod_SLA_pt )
+summary(mod_SLA_cr )
+summary(mod_SLA_al )
+summary(mod_SLA_my )
+summary(mod_SLA_hp )
+summary(mod_SLA_wl )
 
 mod_Thick_pt <- lmer( `thickness (mm)`~ SUB+ (1 | Bloque), data = datos_Pouteria)
 mod_Thick_cr <- lmer(`thickness (mm)` ~ SUB+ (1 | Bloque), data = datos_Clarisia)
@@ -528,6 +537,26 @@ mod_la_al <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_al)
 mod_la_my <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_myrcia)
 mod_la_hp <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_hp)
 mod_la_wl <- lmer(`LA` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+summary(mod_la_pt )
+summary(mod_la_cr )
+summary(mod_la_al )
+summary(mod_la_my )
+summary(mod_la_hp )
+summary(mod_la_wl )
+
+mod_lma_pt <- lmer(`LMA g/m2` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
+mod_lma_cr <- lmer(`LMA g/m2`~ SUB+ (1 | Bloque), data = datos_Clarisia)
+mod_lma_al <- lmer(`LMA g/m2` ~ SUB+ (1 | Bloque), data = datos_al)
+mod_lma_my <- lmer(`LMA g/m2`~ SUB+ (1 | Bloque), data = datos_myrcia)
+mod_lma_hp <- lmer(`LMA g/m2` ~ SUB+ (1 | Bloque), data = datos_hp)
+mod_lma_wl <- lmer(`LMA g/m2` ~ SUB+ (1 | Bloque), data = datos_Weinmania)
+summary(mod_lma_pt )
+summary(mod_lma_cr )
+summary(mod_lma_al )
+summary(mod_lma_my )
+summary(mod_lma_hp )
+summary(mod_lma_wl )
+
 
 
 mod_dmc_pt <- lmer(`dry matter content (mg/g)` ~ SUB+ (1 | Bloque), data = datos_Pouteria)
@@ -1003,28 +1032,28 @@ ggsave(
 
 
 ```{r}
-plot_model(mod_Nmass_al,vline.color = "red",show.values = TRUE, value.offset = .2)
+#plot_model(mod_Nmass_al,vline.color = "red",show.values = TRUE, value.offset = .2)
 
 
-library(sjPlot)
-library(broom.mixed)
-library(dplyr)
-library(ggplot2)
+#library(sjPlot)
+#library(broom.mixed)
+#library(dplyr)
+#library(ggplot2)
 
 # extraer p-values
-coefs <- broom.mixed::tidy(mod_Nmass_al) %>%
-  filter(effect == "fixed")
+#coefs <- broom.mixed::tidy(mod_Nmass_al) %>%
+#  filter(effect == "fixed")
 
 # vector de colores
-cols <- ifelse(coefs$p.value < 0.05, "red", "black")
+#cols <- ifelse(coefs$p.value < 0.05, "red", "black")
 
 # plot
-p <- plot_model(
-  mod_Nmass_al,
-  vline.color = "grey40",
-  show.values = TRUE,
-  value.offset = .2
-)
+#p <- plot_model(
+#  mod_Nmass_al,
+ # vline.color = "grey40",
+ # show.values = TRUE,
+ # value.offset = .2
+#)
 
 # cambiar colores
 
