@@ -1328,17 +1328,17 @@ summary(imod_iwue_narea_we)
 
 ```{r Estimated Means}
 
-plots <- lapply(seq_along(models_iWUE), function(i){
+#plots <- lapply(seq_along(models_iWUE), function(i){
 
-  emm <- emmeans(models_iWUE[[i]], ~ N*P)
+ # emm <- emmeans(models_iWUE[[i]], ~ N*P)
 
-  row_id <- ceiling(i/6)
+#  row_id <- ceiling(i/6)
 
-  plot(emm, horizontal = FALSE) +
-    ggtitle(names(models_iWUE)[i]) +
-    theme_bw()
-})
-wrap_plots(plots, ncol = 6)
+#  plot(emm, horizontal = FALSE) +
+#    ggtitle(names(models_iWUE)[i]) +
+#    theme_bw()
+#})
+#wrap_plots(plots, ncol = 6)
 
 ```
 ```{r}
