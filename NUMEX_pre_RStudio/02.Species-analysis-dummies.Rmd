@@ -257,7 +257,7 @@ tabla <- function(model_list) {
 
 # 1. ISOTOPOS
 
-```{r Modelos sin interaccion }
+```{r Filtrar por especie }
 datos_Pouteria <- data %>%
 filter(data$genus == "Pouteria")
 datos_Clarisia <- data %>%
@@ -313,7 +313,7 @@ mod_Ci_hp_int <- lmer(`Ci/Ca`~ N*P + (1 | Bloque), data = datos_hp)
 mod_Ci_wl_int <- lmer(`Ci/Ca` ~ N*P + (1 | Bloque), data = datos_Weinmania)
 ```
 # 1.B. ADITIVO
-```{r}
+```{r aditivo}
 mod_iWUE_pt <- lmer(`iWUE (μmol/mol)` ~ N+P+ (1 | Bloque) , data = datos_Pouteria)# 
 mod_iWUE_cr <- lmer(`iWUE (μmol/mol)` ~ N+P+ (1 | Bloque) , data = datos_Clarisia)#is Singular
 mod_iWUE_al <- lmer(`iWUE (μmol/mol)` ~ N+P + (1 | Bloque), data = datos_al)
@@ -1399,13 +1399,13 @@ main_figure <- list(
 )
 
 limits_main <- list(
-  c(0, 110),    # fila 1 = iWUE
+  c(0, 125),    # fila 1 = iWUE
   c(2, 3.5),   # loglNC
   c(1.2, 4),   # Narea
   c(-1, 0.8),  #logLPC
-  c(0, 0.5),     #ärea
+  c(0, 0.8),     #Pärea
   c(0, 30),  
-  c(20, 110) #0
+  c(20, 140) #0
 )
 
 ```
