@@ -335,6 +335,13 @@ mod_Ci_al <- lmer(`Ci/Ca` ~ N+P + (1 | Bloque), data = datos_al)
 mod_Ci_my <- lmer(`Ci/Ca`~ N+P + (1 | Bloque), data = datos_myrcia)
 mod_Ci_hp <- lmer(`Ci/Ca`~ N+P + (1 | Bloque), data = datos_hp)
 mod_Ci_wl <- lmer(`Ci/Ca` ~ N+P + (1 | Bloque), data = datos_Weinmania)
+
+summary(mod_iWUE_pt)
+summary(mod_iWUE_cr)
+summary(mod_iWUE_al)
+summary(mod_iWUE_my)
+summary(mod_iWUE_hp)
+summary(mod_iWUE_wl)
 ```
 
 # 1.C. SELECCION
@@ -423,7 +430,7 @@ models_iWUE<- list(
 "iWUE | 3000 | Weinmannia" = mod_iWUE_wl,
 
 # δ13C
-"δ13C | 1000 | Pouteria" = mod_C13_pt,
+"δ13C | 1000 | Pouteria" = mod_C13_pt_int,
 "δ13C | 1000 | Clarisia" = mod_C13_cr,
 "δ13C | 2000 | Alchornea" = mod_C13_al,
 "δ13C | 2000 | Myrcia" = mod_C13_my,
@@ -551,6 +558,8 @@ mod_fol_CN_my_int <- lmer(`C:N` ~ N*P + (1 | Bloque), data = datos_myrcia)
 mod_fol_CN_hp_int <- lmer(`C:N` ~ N*P + (1 | Bloque), data = datos_hp)
 mod_fol_CN_wl_int <- lmer(`C:N` ~ N*P + (1 | Bloque), data = datos_Weinmania)
 
+summary(mod_logNmass_pt)
+summary(mod_logNmass_pt_int)
 
 ```
 ## 2.B Aditivo

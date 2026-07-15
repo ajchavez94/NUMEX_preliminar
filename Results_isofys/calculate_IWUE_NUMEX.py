@@ -31,7 +31,7 @@ def assign_atmospheric_values(df, option="annual"):
 
     if option == "annual":
         
-
+    
         conditions = [
             df["year"] == 2023,
             df["year"] == 2024
