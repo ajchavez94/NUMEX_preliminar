@@ -1,0 +1,293 @@
+---
+title: "SMA"
+author: "Andrea"
+date: "9/3/2026"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r libraries}
+library(ggpmisc)
+library(smatr)
+library(lmodel2)
+library("kableExtra")
+library("openxlsx")
+library(readxl)
+library(tidyverse)
+library(dplyr)
+
+```
+
+
+```{r Data}
+getwd()
+
+data_for_R <- read_excel('data_for_R.xlsx')
+
+data = data_for_R
+
+```
+
+```{r Data2}
+
+datos_3000 <- data%>%
+filter(data$Site == "CaNu")
+
+datos_1000 <- data%>%
+filter(data$Site == "BoN")
+
+datos_2000 <- data %>%
+filter(data$Site == "SFNu")
+
+```
+https://docs.r4photobiology.info/ggpmisc/articles/major-axis-regression.html
+
+```{r}
+library(ggplot2)
+library(ggpmisc)
+
+data$name <- factor(
+  data$name,
+  levels = c(
+    "Clarisia  racemosa",
+    "Pouteria torta",
+    "Alchornea lojaensis",
+    "Myrcia sp nov",
+    "Hedyosmun  purpurascens",
+    "Weinmania  loxensis"
+  )
+)
+species_colors <- c(
+  "Pouteria torta" = "orange",
+  "Clarisia  racemosa" = "gold",
+  "Alchornea lojaensis" = "green",
+  "Myrcia sp nov" = "darkgreen",
+  "Hedyosmun  purpurascens" = "purple",
+  "Weinmania  loxensis" = "blue"
+)
+
+old_theme <- theme_set(theme_bw())
+
+
+
+data$Treatment<- with(
+  data,
+  ifelse(N == 0 & P == 0, "C",
+  ifelse(N == 1 & P == 0, "N",
+  ifelse(N == 0 & P == 1, "P", "N:P")))
+)
+
+data$Treatment<- factor(
+  data$Treatment,
+  levels = c("C", "N", "P", "N:P")
+)
+
+sub_colors <- c(
+  "C"  = "white",
+  "N"  = "red",
+  "P"  = "blue",
+  "N:P" = "gray60"
+)
+```
+
+
+```{r}
+ggplot(data, aes(N_area, `iWUE (μmol/mol)`)) +
+  
+  geom_point(aes(fill= Treatment),
+             shape = 21,
+             color="black",
+             size = 1.5) +#aes(shape = SUB), size = 3
+  stat_ma_line(method = "SMA",color="black",linewidth = 0.5) +
+  stat_ma_eq(
+    method = "SMA",
+    mapping = use_label("eq", "R2"),
+    size =1.8,
+  ) +
+ scale_fill_manual(
+    values = sub_colors)+
+  facet_wrap(~name,nrow = 1)  +
+  labs(
+    x = "Narea",
+    y = "iWUE (μmol/mol)",
+  ) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(
+      size = 7,
+      face = "italic")
+  )
+
+ggsave(
+  "Narea_iWUE_SMA.png",
+  width = 180,      # mm
+  height = 70,      # mm
+  units = "mm",
+  dpi = 300
+)
+```
+```{r}
+
+```
+
+```{r}
+library(smatr)
+
+
+sma <-sma(`iWUE (μmol/mol)`~ N_area, data = datos_Pouteria)
+summary(sma)
+
+sma2 <-sma(`iWUE (μmol/mol)`~ N_area, data = datos_Clarisia)
+summary(sma2)
+
+sma3 <-sma(`iWUE (μmol/mol)`~ N_area, data = datos_al)
+summary(sma3)
+
+sma4 <-sma(`iWUE (μmol/mol)`~ N_area, data = datos_myrcia)
+summary(sma4)
+
+sma5 <-sma(`iWUE (μmol/mol)`~ N_area, data = datos_hp)
+summary(sma5)
+
+sma6 <-sma(`iWUE (μmol/mol)`~ N_area, data = datos_Weinmania)
+summary(sma6)
+
+```
+
+
+```{r SLA}
+
+ggplot(data, aes(`Specific leaf area (cm²/g)`, `iWUE (μmol/mol)`)) +
+  geom_point(aes(fill= Treatment),
+             shape = 21,
+             color="black",
+             size = 1.5) +#ae
+    stat_ma_line(method = "SMA",color="black",linewidth = 0.5) +
+  stat_ma_eq(
+    method = "SMA",
+   mapping = use_label("eq", "R2"),
+  size =1.8, label.x = 0.98,
+  label.y = 0.98,
+  ) +
+ scale_fill_manual(
+    values = sub_colors )+
+  facet_wrap(~name,nrow = 1)  +
+  labs(
+    x = "SLA (cm²/g)",
+    y = "iWUE (μmol/mol)",
+  ) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(
+      size = 7,
+      face = "italic")
+  )
+
+ggsave(
+  "SLA_iWUE_SMA.png",
+  width = 180,      # mm
+  height = 70,      # mm
+  units = "mm",
+  dpi = 300
+)
+
+```
+```{r}
+sma <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_Pouteria)
+summary(sma)
+
+sma2 <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_Clarisia)
+summary(sma2)
+
+sma3 <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_al)
+summary(sma3)
+
+sma4 <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_myrcia)
+summary(sma4)
+
+sma5 <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_hp)
+summary(sma5)
+
+sma6 <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_Weinmania)
+summary(sma6)
+```
+```{r}
+ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
+  
+  geom_point(aes(fill= Treatment),
+             shape = 21,
+             color="black",
+             size = 1.5) +#aes(shape = SUB), size = 3
+  stat_ma_line(method = "SMA",color="black",linewidth = 0.5) +
+  stat_ma_eq(
+    method = "SMA",
+    mapping = use_label("eq", "R2"),
+    size =1.8,
+  ) +
+ scale_fill_manual(
+    values = sub_colors)+
+  facet_wrap(~name,nrow = 1)  +
+  labs(
+    x = "Parea",
+    y = "iWUE (μmol/mol)",
+  ) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(
+      size = 7,
+      face = "italic")
+  )
+
+ggsave(
+  "Parea_iWUE_SMA.png",
+  width = 180,      # mm
+  height = 70,      # mm
+  units = "mm",
+  dpi = 300
+)
+```
+
+```{r}
+ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
+  
+  geom_point(aes(fill= Treatment),
+             shape = 21,
+             color="black",
+             size = 1.5) +#aes(shape = SUB), size = 3
+  stat_ma_line(method = "SMA",color="black",linewidth = 0.5) +
+  stat_ma_eq(
+    method = "SMA",
+    mapping = use_label("eq", "R2"),
+    size =1.8,
+  ) +
+ scale_fill_manual(
+    values = sub_colors)+
+  facet_wrap(~name,nrow = 1)  +
+  labs(
+    x = "Parea",
+    y = "iWUE (μmol/mol)",
+  ) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(
+      size = 7,
+      face = "italic")
+  )
+
+ggsave(
+  "Xtrait_iWUE_SMA.png",
+  width = 180,      # mm
+  height = 70,      # mm
+  units = "mm",
+  dpi = 300
+)
+```
+
+
+
+
