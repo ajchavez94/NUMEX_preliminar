@@ -69,80 +69,82 @@ data <- dplyr::select(data,
 
 
 ```{r funcion para graficar}
-plot_coefs <- function(model, title, color = "black",ylim=NULL,show_y=TRUE) {
+#plot_coefs <- function(model, title, color = "black",ylim=NULL,show_y=TRUE) {
 
-  coefs <- broom.mixed::tidy(
-    model,
-    effects = "fixed",
-    conf.int = TRUE,
-    conf.level = 0.95
-  ) %>%
-    dplyr::filter(term != "(Intercept)") %>%
-    dplyr::mutate(
-      term = gsub("^Sub", "", term),
-      sig = dplyr::case_when(
-        p.value < 0.001 ~ "***",
-        p.value < 0.01  ~ "**",
-        p.value < 0.05  ~ "*",
-        TRUE            ~ ""
-      )
-    )
+#  coefs <- broom.mixed::tidy(
+ #   model,
+  #  effects = "fixed",
+  #  conf.int = TRUE,
+  #  conf.level = 0.95
+  #) %>%
+  #  dplyr::filter(term != "(Intercept)") %>%
+   # dplyr::mutate(
+    #  term = gsub("^Sub", "", term),
+     # sig = dplyr::case_when(
+  #      p.value < 0.001 ~ "***",
+   #     p.value < 0.01  ~ "**",
+    #    p.value < 0.05  ~ "*",
+     #   TRUE            ~ ""
+      #)
+  #  )
 
-  p <- ggplot2::ggplot(coefs, ggplot2::aes(x = term, y = estimate)) +
-    ggplot2::geom_point(size = 3, color = color) +
-    ggplot2::geom_errorbar(
-      ggplot2::aes(ymin = conf.low, ymax = conf.high),
-      width = 0.15,
-      color = color
-    ) +
-    ggplot2::geom_text(
-      ggplot2::aes(
-        label = sig,
-        y = conf.high + 0.05 * max(abs(estimate))
-      ),
-      vjust = -0.6,
-      size = 5,
-      color = color
-    ) +
-    ggplot2::geom_hline(
-      yintercept = 0,
-      linetype = "dashed",
-      color = "grey40"
-    ) +
-    ggplot2::labs(
-      title = title,
-      x = "",
-      y = "Estimate (± 95% CI)"
-    ) +
-    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.2))) +
-    ggplot2::coord_cartesian( ylim = ylim,clip = "off") +
-    ggplot2::theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      plot.margin = margin(0,0,0,0)
-    )
+  #p <- ggplot2::ggplot(coefs, ggplot2::aes(x = term, y = estimate)) +
+   # ggplot2::geom_point(size = 3, color = color) +
+    #ggplot2::geom_errorbar(
+     # ggplot2::aes(ymin = conf.low, ymax = conf.high),
+      #width = 0.15,
+      #color = color
+    #) +
+    #ggplot2::geom_text(
+    #  ggplot2::aes(
+    #    label = sig,
+    #    y = conf.high + 0.05 * max(abs(estimate))
+    #  ),
+    #  vjust = -0.6,
+    #  size = 5,
+    #  color = color
+    #) +
+  #  ggplot2::geom_hline(
+  ##    linetype = "dashed",
+  #    color = "grey40"
+  #  ) +
+  #  ggplot2::labs(
+  #    title = title,
+  #    x = "",
+  #    y = "Estimate (± 95% CI)"
+  #  ) +
+  #  ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.2))) +
+  #  ggplot2::coord_cartesian( ylim = ylim,clip = "off") +
+   # ggplot2::theme(
+    #  axis.text.x = element_text(angle = 45, hjust = 1),
+    #  plot.margin = margin(0,0,0,0)
+    #)
   
-   if (!show_y) {
-    p <- p +
-      ggplot2::theme(
-        axis.title.y = element_blank(),
-        axis.text.y  = element_blank(),
-        axis.ticks.y = element_blank()
-      )
-   }
-    return(p)
-}
+  # if (!show_y) {
+   # p <- p +
+    #  ggplot2::theme(
+     #   axis.title.y = element_blank(),
+    #    axis.text.y  = element_blank(),
+    #    axis.ticks.y = element_blank()
+     # )
+  # }
+  #  return(p)
+#}
 ```
 
 ```{r tabla}
+
 
 tabla <- function(model_list) {
 
   tab <- modelsummary(
     model_list,
-    output = "data.frame",
-    statistics = TRUE,
-    stars = TRUE,
-    gof_map = c("nobs", "r2.marginal", "r2.conditional", "aic")
+    output    = "data.frame",
+    estimate  = "{estimate}{stars} (SE = {std.error}, p = {p.value})",  # 👈 aquí va todo junto
+    statistic = NULL,                                                   # 👈 ya no hace falta línea aparte
+    stars     = TRUE,                                                   # necesario para que {stars} se resuelva
+    fmt       = 2,                                                      # opcional: controla decimales
+    gof_map   = c("nobs", "r2.marginal", "r2.conditional", "aic")
   )
 
   # Transponer
@@ -752,71 +754,71 @@ final_plot
 ## 4.2. GRAFICOS 2
 ```{r GGPLOT2}
 
-p1_iWUE <- plot_coefs(mod_iWUE_pt, "P. torta",color="#458B74")
-p2_iWUE <- plot_coefs(mod_iWUE_cr, "C. racemosa",color="#458B74")
-p3_iWUE <- plot_coefs(mod_iWUE_my, "M. sp",color="#458B74")
-p4_iWUE <- plot_coefs(mod_iWUE_al, "A. lojaensis",color="#458B74")
-p5_iWUE <- plot_coefs(mod_iWUE_hp, "H. purpurascens",color="#458B74")
-p6_iWUE <- plot_coefs(mod_iWUE_wl, "W. loxensis",color="#458B74")
+#p1_iWUE <- plot_coefs(mod_iWUE_pt, "P. torta",color="#458B74")
+#p2_iWUE <- plot_coefs(mod_iWUE_cr, "C. racemosa",color="#458B74")
+#p3_iWUE <- plot_coefs(mod_iWUE_my, "M. sp",color="#458B74")
+#p4_iWUE <- plot_coefs(mod_iWUE_al, "A. lojaensis",color="#458B74")
+#p5_iWUE <- plot_coefs(mod_iWUE_hp, "H. purpurascens",color="#458B74")
+#p6_iWUE <- plot_coefs(mod_iWUE_wl, "W. loxensis",color="#458B74")
 
 #logNmass
-p1_Narea <- plot_coefs(mod_logNmass_pt, "P.torta",color="#458B00")
-p2_Narea <- plot_coefs(mod_logNmass_cr, "C. racemosa",color="#458B00")
-p3_Narea <- plot_coefs(mod_logNmass_my, "M. sp",color="#458B00")
-p4_Narea <- plot_coefs(mod_logNmass_al, "A. lojaensis",color="#458B00")
-p5_Narea <- plot_coefs(mod_logNmass_hp, "H. purpurascens",color="#458B00")
-p6_Narea <- plot_coefs(mod_logNmass_wl, "W. loxensis",color="#458B00")
+#p1_Narea <- plot_coefs(mod_logNmass_pt, "P.torta",color="#458B00")
+#p2_Narea <- plot_coefs(mod_logNmass_cr, "C. racemosa",color="#458B00")
+#p3_Narea <- plot_coefs(mod_logNmass_my, "M. sp",color="#458B00")
+#p4_Narea <- plot_coefs(mod_logNmass_al, "A. lojaensis",color="#458B00")
+#p5_Narea <- plot_coefs(mod_logNmass_hp, "H. purpurascens",color="#458B00")
+#p6_Narea <- plot_coefs(mod_logNmass_wl, "W. loxensis",color="#458B00")
 
-p1_Parea <- plot_coefs(mod_logPmass_pt, "P.torta",color="#CD5B45")
-p2_Parea <- plot_coefs(mod_logPmass_cr, "C. racemosa",color="#CD5B45")
-p3_Parea <- plot_coefs(mod_logPmass_my, "M. sp",color="#CD5B45")
-p4_Parea <- plot_coefs(mod_logPmass_al, "A. lojaensis",color="#CD5B45")
-p5_Parea <- plot_coefs(mod_logPmass_hp, "H. purpurascens",color="#CD5B45")
-p6_Parea <- plot_coefs(mod_logPmass_wl, "W. loxensis",color="#CD5B45")
+#p1_Parea <- plot_coefs(mod_logPmass_pt, "P.torta",color="#CD5B45")
+#p2_Parea <- plot_coefs(mod_logPmass_cr, "C. racemosa",color="#CD5B45")
+#p3_Parea <- plot_coefs(mod_logPmass_my, "M. sp",color="#CD5B45")
+#p4_Parea <- plot_coefs(mod_logPmass_al, "A. lojaensis",color="#CD5B45")
+#p5_Parea <- plot_coefs(mod_logPmass_hp, "H. purpurascens",color="#CD5B45")
+#p6_Parea <- plot_coefs(mod_logPmass_wl, "W. loxensis",color="#CD5B45")
 
 
-p1_SLA <- plot_coefs(mod_fol_NP_pt
-, "P. torta",color="#CD661D")
-p2_SLA <- plot_coefs(mod_fol_NP_cr, "C. racemosa",color="#CD661D")
-p3_SLA <- plot_coefs(mod_fol_NP_my, "M. sp",color="#CD661D")
-p4_SLA <- plot_coefs(mod_fol_NP_al, "A. lojaensis",color="#CD661D")
-p5_SLA <- plot_coefs(mod_fol_NP_hp, "H. purpurascens",color="#CD661D")
-p6_SLA <- plot_coefs(mod_fol_NP_wl, "W. loxensis",color="#CD661D")
+#p1_SLA <- plot_coefs(mod_fol_NP_pt
+#, "P. torta",color="#CD661D")
+#p2_SLA <- plot_coefs(mod_fol_NP_cr, "C. racemosa",color="#CD661D")
+#p3_SLA <- plot_coefs(mod_fol_NP_my, "M. sp",color="#CD661D")
+#p4_SLA <- plot_coefs(mod_fol_NP_al, "A. lojaensis",color="#CD661D")
+#p5_SLA <- plot_coefs(mod_fol_NP_hp, "H. purpurascens",color="#CD661D")
+#p6_SLA <- plot_coefs(mod_fol_NP_wl, "W. loxensis",color="#CD661D")
 
-remove_title <- theme(plot.title = element_blank())
+#remove_title <- theme(plot.title = element_blank())
 
 # aplicar a todas menos la primera fila
-p1_Narea <- p1_Narea + remove_title
-p2_Narea <- p2_Narea + remove_title
-p3_Narea <- p3_Narea + remove_title
-p4_Narea <- p4_Narea + remove_title
-p5_Narea <- p5_Narea + remove_title
-p6_Narea <- p6_Narea + remove_title
+#p1_Narea <- p1_Narea + remove_title
+#p2_Narea <- p2_Narea + remove_title
+#p3_Narea <- p3_Narea + remove_title
+#p4_Narea <- p4_Narea + remove_title
+#p5_Narea <- p5_Narea + remove_title
+#p6_Narea <- p6_Narea + remove_title
 
-p1_Parea <- p1_Parea + remove_title
-p2_Parea <- p2_Parea + remove_title
-p3_Parea <- p3_Parea + remove_title
-p4_Parea <- p4_Parea + remove_title
-p5_Parea <- p5_Parea + remove_title
-p6_Parea <- p6_Parea + remove_title
+#p1_Parea <- p1_Parea + remove_title
+#p2_Parea <- p2_Parea + remove_title
+#p3_Parea <- p3_Parea + remove_title
+#p4_Parea <- p4_Parea + remove_title
+#p5_Parea <- p5_Parea + remove_title
+#p6_Parea <- p6_Parea + remove_title
 
-p1_SLA <- p1_SLA + remove_title
-p2_SLA <- p2_SLA + remove_title
-p3_SLA <- p3_SLA + remove_title
-p4_SLA <- p4_SLA + remove_title
-p5_SLA <- p5_SLA + remove_title
-p6_SLA <- p6_SLA + remove_title
+#p1_SLA <- p1_SLA + remove_title
+#p2_SLA <- p2_SLA + remove_title
+#p3_SLA <- p3_SLA + remove_title
+#p4_SLA <- p4_SLA + remove_title
+#p5_SLA <- p5_SLA + remove_title
+#p6_SLA <- p6_SLA + remove_title
 
 
-final_plot <- (p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE) /
-              (p1_Narea | p2_Narea | p3_Narea | p4_Narea | p5_Narea | p6_Narea) /
-              (p1_Parea | p2_Parea | p3_Parea | p4_Parea | p5_Parea | p6_Parea) /
-              (p1_SLA  | p2_SLA  | p3_SLA  | p4_SLA  | p5_SLA  | p6_SLA)
+#final_plot <- (p1_iWUE  | p2_iWUE  | p3_iWUE  | p4_iWUE  | p5_iWUE  | p6_iWUE) /
+#              (p1_Narea | p2_Narea | p3_Narea | p4_Narea | p5_Narea | p6_Narea) /
+#              (p1_Parea | p2_Parea | p3_Parea | p4_Parea | p5_Parea | p6_Parea) /
+#              (p1_SLA  | p2_SLA  | p3_SLA  | p4_SLA  | p5_SLA  | p6_SLA)
 
-ggsave("figure_poster.png",
-       plot = final_plot,
-       width = 16, height = 12,  # ajusta según tu póster
-       dpi = 300)               # 300–600 para alta calidad
+#ggsave("figure_poster.png",
+ #      plot = final_plot,
+  #     width = 16, height = 12,  # ajusta según tu póster
+   #    dpi = 300)               # 300–600 para alta calidad
 
 ```
 
@@ -897,136 +899,6 @@ summary(imod_iwue_Parea_we)
 # Efectos graficos:
 Se tendria que poner la significancia manualmente.
 
-```{r efectos}
-library(lme4)
-library(effects)
-library(ggplot2)
-library(patchwork)
-
-# =========================================================
-# Colors for SUB treatments
-# =========================================================
-
-sub_colors <- c(
-  "C"  = "grey40",
-  "N"  = "blue",
-  "P"  = "yellow",
-  "NP" = "red"
-)
-
-row_limits <- list(
-  c(10, 130),    # fila 1
-  c(-23, -33),   # fila 2
-  c(0.5, 0.95)    # fila 6
-)
-# =========================================================
-# Function to create effect plot
-# =========================================================
-
-plot_effects <- function(model, title_name){
-
-  # Extract effects
-  e <- allEffects(model)
-
-  # First effect
-  e1 <- e[[1]]
-
-  # Convert to dataframe
-  e.df <- as.data.frame(e1)
-
-  # Plot
-  g <- ggplot(
-        e.df,
-        aes(
-          x = SUB,
-          y = fit,
-          ymin = lower,
-          ymax = upper,
-          color = SUB
-        )
-      )  +
-      geom_pointrange(
-        position = position_dodge(width = 0.1),
-        size = 0.8
-      ) +
-
-      scale_color_manual(values = sub_colors) +
-
-      labs(
-        x = "Treatment",
-        y = "Predicted value",
-        title = title_name,
-        color = "SUB"
-      ) +
-
-      theme_gray() +
-
-      theme(
-        plot.title = element_text(
-          hjust = 0.5,
-          face = "bold",axis.line = element_line(linewidth = 3, colour = "grey80"),
-          panel.grid.major = element_line(colour = "grey80")),
-
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 11),
-        legend.position = "right"
-      )
-
-  return(g)
-}
-
-# =========================================================
-# Generate all plots
-# =========================================================
-
-plot_list <- lapply(
-  seq_along(names(models_iWUE)),
-  function(i){
-
-    model <- models_iWUE[[i]]
-    # identificar fila
-    row_id <- ceiling(i / 6)
-    
-
-    plot_effects(
-      model = model,
-      title_name = names(models_iWUE)[i]
-    ) +
-      coord_cartesian(
-        ylim = row_limits[[row_id]]
-      )
-  }
-)
-
-# =========================================================
-# Arrange in 6 rows x 3 columns
-# =========================================================
-
-final_plot <- wrap_plots(
-  plot_list,
-  ncol = 6,
- nrow = 3,
-guides = "collect"
-) &
-theme(
-  legend.position = "bottom"
-)
-
-
-# Display
-final_plot
-# =========================================================
-# OPTIONAL: Save all plots
-# =========================================================
-
-ggsave(
-  "all_leaf_effects.png",
-  final_plot,
-  width = 18,
-  height = 12,
-  dpi = 300
-)
-```
 
 
 

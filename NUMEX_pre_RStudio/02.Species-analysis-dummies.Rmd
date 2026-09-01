@@ -762,12 +762,12 @@ models_est <- list(
 "Narea | 3000 | Weinmannia" = mod_Narea_wl,
 
 # Cmass
-"Cmass | 1000 | Pouteria" = mod_Cmass_pt,
-"Cmass | 1000 | Clarisia" = mod_Cmass_cr_int,
-"Cmass | 2000 | Alchornea" = mod_Cmass_al,
-"Cmass | 2000 | Myrcia" = mod_Cmass_my,
-"Cmass | 3000 | Hedyosmum" = mod_Cmass_hp,
-"Cmass | 3000 | Weinmannia" = mod_Cmass_wl,
+"LCC | 1000 | Pouteria" = mod_Cmass_pt,
+"LCC | 1000 | Clarisia" = mod_Cmass_cr_int,
+"LCC | 2000 | Alchornea" = mod_Cmass_al,
+"LCC | 2000 | Myrcia" = mod_Cmass_my,
+"LCC | 3000 | Hedyosmum" = mod_Cmass_hp,
+"LCC | 3000 | Weinmannia" = mod_Cmass_wl,
 
 # Carea
 "Carea | 1000 | Pouteria" = mod_Carea_pt,
@@ -789,14 +789,14 @@ models_est <- list(
 "LPC | 1000 | Clarisia" = mod_Pmass_cr,
 "LPC | 2000 | Alchornea" = mod_Pmass_al,
 "LPC | 2000 | Myrcia" = mod_Pmass_my_int,
-"LPC | 3000 | Hedyosmum" = mod_Pmass_hp,
+"LPC | 3000 | Hedyosmum" = mod_Pmass_hp_int,
 "LPC | 3000 | Weinmannia" = mod_Pmass_wl_int,
 
 "logLPC | 1000 | Pouteria" = mod_logPmass_pt,
 "logLPC | 1000 | Clarisia" = mod_logPmass_cr,
 "logLPC | 2000 | Alchornea" = mod_logPmass_al,
 "logLPC | 2000 | Myrcia" = mod_logPmass_my_int,
-"logLPC | 3000 | Hedyosmum" = mod_logPmass_hp,
+"logLPC | 3000 | Hedyosmum" = mod_logPmass_hp_int,
 "logLPC | 3000 | Weinmannia" = mod_logPmass_wl_int,
 
 # Carea
@@ -843,9 +843,9 @@ models_N_graphic <- list(
 "Leaf N:P | 1000 | Pouteria" = mod_fol_NP_pt,
 "Leaf N:P | 1000 | Clarisia" = mod_fol_NP_cr,
 "Leaf N:P | 2000 | Alchornea" = mod_fol_NP_al,
-"Leaf N:P | 2000 | Myrcia" = mod_fol_NP_my,
+"Leaf N:P | 2000 | Myrcia" = mod_fol_NP_my_int,
 "Leaf N:P | 3000 | Hedyosmum" = mod_fol_NP_hp,
-"Leaf N:P | 3000 | Weinmannia" = mod_fol_NP_wl
+"Leaf N:P | 3000 | Weinmannia" = mod_fol_NP_wl_int
 )
 ```
 ## 2.1. Tabla
@@ -882,12 +882,12 @@ for (name in names(models_est)) {
 ```{r morpho}
 
 
-mod_SLA_pt <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
-mod_SLA_cr <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Clarisia)
-mod_SLA_al <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_al)
-mod_SLA_my <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
-mod_SLA_hp <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_hp)
-mod_SLA_wl <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
+mod_SLA_pt_int  <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
+mod_SLA_cr_int  <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Clarisia)
+mod_SLA_al_int  <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_al)
+mod_SLA_my_int  <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
+mod_SLA_hp_int  <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_hp)
+mod_SLA_wl_int  <- lmer(`Specific leaf area (cm²/g)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
 summary(mod_SLA_pt )
 summary(mod_SLA_cr )
 summary(mod_SLA_al )
@@ -895,12 +895,12 @@ summary(mod_SLA_my )
 summary(mod_SLA_hp )
 summary(mod_SLA_wl ) 
 
-mod_Thick_pt <- lmer( `thickness (mm)`~ N*P+ (1 | Bloque), data = datos_Pouteria)
-mod_Thick_cr <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_Clarisia)
-mod_Thick_al <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_al)
-mod_Thick_my <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
-mod_Thick_hp <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_hp)
-mod_Thick_wl <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
+mod_Thick_pt_int <- lmer( `thickness (mm)`~ N*P+ (1 | Bloque), data = datos_Pouteria)
+mod_Thick_cr_int  <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_Clarisia)
+mod_Thick_al_int  <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_al)
+mod_Thick_my_int  <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
+mod_Thick_hp_int  <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_hp)
+mod_Thick_wl_int  <- lmer(`thickness (mm)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
 summary(mod_Thick_pt )
 summary(mod_Thick_cr )
 summary(mod_Thick_al )
@@ -908,12 +908,12 @@ summary(mod_Thick_my )
 summary(mod_Thick_hp )
 summary(mod_Thick_wl )
 
-mod_Tough_pt <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
-mod_Tough_cr <- lmer(`force to punch (kN/m)`~ N*P+ (1 | Bloque), data = datos_Clarisia)
-mod_Tough_al <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_al)
-mod_Tough_my <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
-mod_Tough_hp <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_hp)
-mod_Tough_wl <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
+mod_Tough_pt_int  <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
+mod_Tough_cr_int  <- lmer(`force to punch (kN/m)`~ N*P+ (1 | Bloque), data = datos_Clarisia)
+mod_Tough_al_int  <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_al)
+mod_Tough_my_int  <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
+mod_Tough_hp_int  <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_hp)
+mod_Tough_wl_int  <- lmer(`force to punch (kN/m)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
 summary(mod_Tough_pt )
 summary(mod_Tough_cr )
 summary(mod_Tough_al )
@@ -923,12 +923,12 @@ summary(mod_Tough_wl )
 
 
 
-mod_la_pt <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
-mod_la_cr <- lmer(`LA`~ N*P+ (1 | Bloque), data = datos_Clarisia)
-mod_la_al <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_al)
-mod_la_my <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_myrcia)
-mod_la_hp <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_hp)
-mod_la_wl <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
+mod_la_pt_int  <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
+mod_la_cr_int  <- lmer(`LA`~ N*P+ (1 | Bloque), data = datos_Clarisia)
+mod_la_al_int  <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_al)
+mod_la_my_int  <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_myrcia)
+mod_la_hp_int  <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_hp)
+mod_la_wl_int  <- lmer(`LA` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
 summary(mod_la_pt )
 summary(mod_la_cr )
 summary(mod_la_al )
@@ -936,12 +936,12 @@ summary(mod_la_my )
 summary(mod_la_hp )
 summary(mod_la_wl )
 
-mod_dmc_pt <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
-mod_dmc_cr <- lmer(`dry matter content (mg/g)`~ N*P+ (1 | Bloque), data = datos_Clarisia)
-mod_dmc_al <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_al)
-mod_dmc_my <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
-mod_dmc_hp <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_hp)
-mod_dmc_wl <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
+mod_dmc_pt_int  <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_Pouteria)
+mod_dmc_cr_int  <- lmer(`dry matter content (mg/g)`~ N*P+ (1 | Bloque), data = datos_Clarisia)
+mod_dmc_al_int  <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_al)
+mod_dmc_my_int  <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_myrcia)
+mod_dmc_hp_int  <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_hp)
+mod_dmc_wl_int  <- lmer(`dry matter content (mg/g)` ~ N*P+ (1 | Bloque), data = datos_Weinmania)
 summary(mod_dmc_pt )
 summary(mod_dmc_cr )
 summary(mod_dmc_al )
@@ -1189,7 +1189,7 @@ models_leaf <- list(
 
 # Thickness
 "Thickness | 1000 | Pouteria" = mod_Thick_pt,
-"Thickness | 1000 | Clarisia" = mod_Thick_cr,
+"Thickness | 1000 | Clarisia" = mod_Thick_cr_int,
 "Thickness | 2000 | Alchornea" = mod_Thick_al,
 "Thickness | 2000 | Myrcia" = mod_Thick_my,
 "Thickness | 3000 | Hedyosmum" = mod_Thick_hp,

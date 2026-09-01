@@ -137,7 +137,7 @@ ggsave(
 ```{r}
 
 ```
-
+# Narea 
 ```{r}
 library(smatr)
 
@@ -199,6 +199,8 @@ ggsave(
 )
 
 ```
+
+#SMA
 ```{r}
 sma <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_Pouteria)
 summary(sma)
@@ -254,7 +256,7 @@ ggsave(
 ```
 
 ```{r}
-ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
+ggplot(data, aes(`P_area`, `iWUE (μmol/mol)`)) +
   
   geom_point(aes(fill= Treatment),
              shape = 21,
@@ -280,12 +282,37 @@ ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
   )
 
 ggsave(
-  "Xtrait_iWUE_SMA.png",
+  "Parea_iWUE_SMA.png",
   width = 180,      # mm
   height = 70,      # mm
   units = "mm",
   dpi = 300
 )
+```
+
+# Parea 
+```{r}
+library(smatr)
+
+
+sma <-sma(`iWUE (μmol/mol)`~ P_area, data = datos_Pouteria)
+summary(sma)
+
+sma2 <-sma(`iWUE (μmol/mol)`~ P_area, data = datos_Clarisia)
+summary(sma2)
+
+sma3 <-sma(`iWUE (μmol/mol)`~ P_area, data = datos_al)
+summary(sma3)
+
+sma4 <-sma(`iWUE (μmol/mol)`~ P_area, data = datos_myrcia)
+summary(sma4)
+
+sma5 <-sma(`iWUE (μmol/mol)`~ P_area, data = datos_hp)
+summary(sma5)
+
+sma6 <-sma(`iWUE (μmol/mol)`~ P_area, data = datos_Weinmania)
+summary(sma6)
+
 ```
 
 
