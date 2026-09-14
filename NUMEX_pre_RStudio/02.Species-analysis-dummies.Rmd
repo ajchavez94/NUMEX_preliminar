@@ -840,17 +840,31 @@ models_N_graphic <- list(
 "Narea | 3000 | Hedyosmum" = mod_Narea_hp,
 "Narea | 3000 | Weinmannia" = mod_Narea_wl,
 
+"Parea | 1000 | Pouteria" = mod_Narea_pt,
+"Parea | 1000 | Clarisia" = mod_Narea_cr,
+"Parea | 2000 | Alchornea" = mod_Narea_al,
+"Parea | 2000 | Myrcia" = mod_Narea_my,
+"Parea | 3000 | Hedyosmum" = mod_Narea_hp,
+"Parea | 3000 | Weinmannia" = mod_Narea_wl,
+
 "Leaf N:P | 1000 | Pouteria" = mod_fol_NP_pt,
 "Leaf N:P | 1000 | Clarisia" = mod_fol_NP_cr,
 "Leaf N:P | 2000 | Alchornea" = mod_fol_NP_al,
 "Leaf N:P | 2000 | Myrcia" = mod_fol_NP_my_int,
 "Leaf N:P | 3000 | Hedyosmum" = mod_fol_NP_hp,
-"Leaf N:P | 3000 | Weinmannia" = mod_fol_NP_wl_int
+"Leaf N:P | 3000 | Weinmannia" = mod_fol_NP_wl_int,
+
+"Leaf C:N | 1000 | Pouteria" = mod_fol_CN_pt,
+"Leaf C:N | 1000 | Clarisia" = mod_fol_CN_cr,
+"Leaf C:N | 2000 | Alchornea" = mod_fol_CN_al,
+"Leaf C:N | 2000 | Myrcia" = mod_fol_CN_my,
+"Leaf C:N | 3000 | Hedyosmum" = mod_fol_CN_hp,
+"Leaf C:N | 3000 | Weinmannia" = mod_fol_CN_wl
 )
 ```
 ## 2.1. Tabla
 ```{r tabla 2}
-tabla(models_est)
+tabla(models_N_graphic)
 ```
 
 ## 2.2. Diagnostico

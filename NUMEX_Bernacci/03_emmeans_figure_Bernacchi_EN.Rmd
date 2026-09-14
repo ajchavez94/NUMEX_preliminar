@@ -1,0 +1,830 @@
+---
+title: "Estimated marginal means figure — Bernacchi dataset (NUMEX N×P)"
+author: "Andrea Chávez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Para qué sirve este archivo
+
+Este Rmd hace **una sola cosa**: la figura de medias marginales estimadas (emmeans)
+con los puntos individuales y los asteriscos de contraste contra el control.
+No calcula tablas, ni exporta Word, ni hace diagnósticos — eso sigue en
+`02_Species_analysis_dummies_Bernacchi_EN.Rmd`.
+
+Los textos de la figura están en **inglés** (para el manuscrito); los comentarios del
+código están en **español** para que puedas leerlo y modificarlo sin depender de nadie.
+
+## Los dos problemas del script anterior, y cómo se arreglan aquí
+
+**Problema 1 — los asteriscos no coincidían con las tablas.**
+El código anterior usaba:
+
+```r
+contrast(emm, method = "trt.vs.ctrl", ref = 1)
+```
+
+`emmeans` aplica **por defecto** una corrección por comparaciones múltiples
+(método *Dunnett*, aquí `dunnettx`) cuando el método es `trt.vs.ctrl`. Es decir,
+los p-valores de la figura estaban **ajustados**, mientras que los p-valores de todas
+las tablas del documento (que salen de `summary(modelo)` / `broom.mixed::tidy()`)
+están **sin ajustar**. Los dos números son correctos, pero **no son el mismo número**,
+y por eso la figura y las tablas se contradecían.
+
+En los datos reales esto cambia el resultado en **24 de 126 celdas** (7 variables ×
+6 especies × 3 contrastes). Ejemplos con `logPmass`:
+
+| Especie        | Contraste | p tabla (sin ajustar) | p figura (Dunnett) | Símbolo tabla | Símbolo figura |
+|----------------|-----------|----------------------:|-------------------:|:-------------:|:--------------:|
+| P. torta       | P vs C    | 0.081                 | 0.198              | †             | (nada)         |
+| C. racemosa    | P vs C    | 0.004                 | 0.011              | **            | *              |
+| C. racemosa    | N+P vs C  | 0.006                 | 0.016              | **            | *              |
+| H. purpurascens| N+P vs C  | 0.007                 | 0.019              | **            | *              |
+
+O sea: el modelo **sí** detecta la respuesta al P, pero la figura la escondía o la
+degradaba. No era que hubiera asteriscos de más; era que faltaban.
+
+**Solución aquí:** el ajuste deja de estar escondido en un valor por defecto y pasa a
+ser una decisión explícita. Se calculan **los dos p-valores del mismo contraste** y se
+generan **tres figuras**:
+
+| Archivo                                | Asteriscos |
+|----------------------------------------|------------|
+| `fig_emmeans_unadjusted_Bernacchi_EN.png` | p sin ajustar — idénticos a las tablas |
+| `fig_emmeans_Dunnett_Bernacchi_EN.png`    | p corregidos por Dunnett |
+| `fig_emmeans_both_Bernacchi_EN.png`       | símbolo del p sin ajustar, en negro si la corrección no lo cambia y en gris si la corrección lo debilita o lo elimina |
+
+Además se fija `emm_options(lmer.df = "satterthwaite")` para usar los mismos grados de
+libertad que `lmerTest` usa en `summary(modelo)` (`emmeans` por defecto usa
+Kenward-Roger, que da p-valores ligeramente distintos). Con eso, la versión sin
+ajustar y las tablas coinciden **dígito a dígito** — la sección 5 lo comprueba
+automáticamente y avisa si alguna vez dejan de coincidir.
+
+> Las dos son defendibles: sin ajustar es lo coherente con las tablas del manuscrito;
+> Dunnett es lo correcto si se quiere controlar el error de tipo I sobre las tres
+> comparaciones contra el control. Si eliges la versión Dunnett para el manuscrito,
+> hay que corregir **también** los p-valores de las tablas, o volverás a tener el
+> mismo desacuerdo al revés.
+
+**Problema 2 — las etiquetas `n=` rojas chocaban con los puntos.**
+Antes se dibujaban dentro del área de datos. Aquí se reserva una **franja vacía al pie
+de cada panel** donde nunca hay datos ni intervalos, y las etiquetas van ahí.
+
+**Riesgo silencioso que también se elimina.** El código anterior asignaba los nombres
+de los contrastes por posición:
+
+```r
+ct$Treatment <- c("N", "P", "N+P")   # asume el orden que devuelve emmeans
+```
+
+Ese orden es hoy el correcto, pero depende de cómo `emmeans` construya la rejilla; si
+cambia (otra versión, otro orden en `at`), los asteriscos se pegarían al tratamiento
+equivocado **sin ningún aviso**. Aquí los contrastes se construyen buscando cada celda
+por sus valores de `N` y `P`, así que la etiqueta no puede desalinearse nunca.
+
+---
+
+```{r librerias}
+library(readxl)
+library(dplyr)
+library(purrr)
+library(lme4)
+library(lmerTest)     # añade p-valores a lmer()
+library(emmeans)
+library(ggplot2)
+library(patchwork)
+```
+
+# 1. Opciones (lo único que normalmente vas a tocar)
+
+```{r opciones}
+# Ruta del archivo de datos
+ARCHIVO <- "data_for_R_Bernacchi.xlsx"
+
+# Versiones de la figura que se van a generar. Los tres p-valores salen del MISMO
+# modelo y del MISMO contraste; lo único que cambia es la corrección por
+# comparaciones múltiples que se aplica antes de convertirlos en asteriscos.
+#
+#   "none"     -> p sin ajustar: idénticos a summary(modelo) y a las tablas
+#   "dunnettx" -> p corregidos por Dunnett (3 comparaciones contra el control)
+#   "ambos"    -> asterisco del p SIN ajustar, en negro si además sobrevive a
+#                 Dunnett y en gris si solo se sostiene sin corrección
+#
+# Puedes dejar solo la que vayas a usar; genera un PNG por cada una.
+MODOS <- c("none", "dunnettx", "ambos")
+
+ARCHIVOS <- c(
+  "none"     = "fig_emmeans_unadjusted_Bernacchi_EN.png",
+  "dunnettx" = "fig_emmeans_Dunnett_Bernacchi_EN.png",
+  "ambos"    = "fig_emmeans_both_Bernacchi_EN.png"
+)
+
+# Versión que se usará en el manuscrito (la que decide el reparto principal /
+# suplementario de la sección 7).
+MODO_MANUSCRITO <- "none"
+
+# Umbral de tamaño de celda por debajo del cual se marca la n en rojo
+N_MINIMO <- 3
+
+# Tamaño de salida en pulgadas (figura completa, 7 filas)
+ANCHO    <- 10
+ALTO     <- 12
+
+# Grados de libertad de emmeans: "satterthwaite" = igual que lmerTest::summary().
+# Si lo dejas en el valor por defecto de emmeans ("kenward-roger"), los p de la
+# figura salen parecidos pero no idénticos a los de las tablas.
+emm_options(lmer.df = "satterthwaite")
+```
+
+# 2. Datos
+
+```{r datos}
+data <- read_excel(ARCHIVO, sheet = "data")
+
+data <- data %>%
+  mutate(
+    logNmass = log(LNC),
+    logPmass = log(LPC),
+    logCmass = log(LCC),
+    Block    = factor(Bloque)   # alias en inglés de la columna original "Bloque"
+  )
+
+# Algunas columnas del Excel llevan caracteres especiales (μ de "μmol/mol", ² de "cm²").
+# Escribirlos a mano es peligroso: el signo micro (µ, U+00B5) y la mu griega
+# (μ, U+03BC) se ven IGUAL en pantalla pero son caracteres distintos, y si te
+# equivocas R dice "columna no encontrada" o, peor, falla en silencio.
+# Por eso aquí nunca se teclea el nombre completo: se busca por un patrón simple.
+col_por_patron <- function(patron) {
+  hit <- grep(patron, names(data), value = TRUE, fixed = FALSE)
+  if (length(hit) != 1) {
+    stop("El patrón '", patron, "' encontró ", length(hit),
+         " columnas (debe encontrar exactamente 1): ", paste(hit, collapse = " | "))
+  }
+  hit
+}
+
+COL_iWUE <- col_por_patron("^iWUE_Bernacchi")
+COL_SLA  <- col_por_patron("^Specific leaf area")
+
+# Comprobación de que el diseño está codificado como esperamos: 4 celdas 0/1.
+stopifnot(all(data$N %in% c(0, 1)), all(data$P %in% c(0, 1)))
+table(N = data$N, P = data$P)
+```
+
+```{r especies}
+# Nombre corto (el que sale en la figura) = nombre tal cual está en species_label
+species_list <- list(
+  "P. torta"        = "Pouteria torta",
+  "C. racemosa"     = "Clarisia racemosa",
+  "A. lojaensis"    = "Alchornea lojaensis",
+  "Myrcia sp. nov." = "Myrcia sp nov",
+  "H. purpurascens" = "Hedyosmum purpurascens",
+  "W. loxensis"     = "Weinmannia loxensis"
+)
+
+species_data <- lapply(species_list, function(sp) filter(data, species_label == sp))
+stopifnot(all(sapply(species_data, nrow) > 0))   # aborta si algún nombre no cuadra
+sapply(species_data, nrow)
+```
+
+```{r variables}
+# Filas de la figura. El NOMBRE es la etiqueta del eje Y (con unidades);
+# el VALOR es la columna real del Excel. Añadir o quitar una fila de la figura
+# es añadir o quitar una línea aquí, nada más.
+vars_fig <- c(
+  "iWUE, B (µmol mol-1)"  = COL_iWUE,
+  "log LNC (mg g-1)"      = "logNmass",
+  "N content, area-based (g m-2)" = "N_area",
+  "log LPC (mg g-1)"      = "logPmass",
+  "P content, area-based (g m-2)" = "P_area",
+  "Leaf N:P ratio (mass-based)"   = "N:P",
+  "SLA (cm² g-1)"                 = COL_SLA
+)
+
+stopifnot(all(vars_fig %in% names(data)))   # aborta si alguna columna no existe
+```
+
+```{r paleta}
+C_N  <- "#2c6fbb"   # azul  = N
+C_P  <- "#c0392b"   # rojo  = P
+C_NP <- "#7f7f7f"   # gris  = N+P
+C_C  <- "#ffffff"   # blanco = control
+
+# Color de relleno del punto grande (la media marginal)
+fill_trt <- c("C" = C_C, "N" = C_N, "P" = C_P, "N+P" = C_NP)
+# Color de los puntos individuales (más apagado para que no compita)
+dot_trt  <- c("C" = "#9a9a9a", "N" = C_N, "P" = C_P, "N+P" = "#6f6f6f")
+
+NIVELES <- c("C", "N", "P", "N+P")   # orden de los tratamientos en el eje X
+
+estrellas <- function(p) {
+  case_when(is.na(p) ~ "", p < 0.001 ~ "***", p < 0.01 ~ "**",
+            p < 0.05 ~ "*", p < 0.10 ~ "†", TRUE ~ "")
+}
+
+# Devuelve, para un modo dado, QUÉ asterisco se dibuja y DE QUÉ COLOR.
+# Separar esto en su propia función es lo que permite tener tres versiones de la
+# figura sin duplicar el código del gráfico.
+asteriscos_de <- function(rej, modo) {
+  if (modo == "none") {
+    rej$sig       <- estrellas(rej$p_none)
+    rej$sig_color <- "black"
+  } else if (modo == "dunnettx") {
+    rej$sig       <- estrellas(rej$p_dunnett)
+    rej$sig_color <- "black"
+  } else if (modo == "ambos") {
+    rej$sig       <- estrellas(rej$p_none)
+    # negro = el símbolo NO cambia al corregir por Dunnett;
+    # gris  = la corrección lo debilita (p.ej. ** -> *) o lo elimina.
+    rej$sig_color <- ifelse(estrellas(rej$p_dunnett) == estrellas(rej$p_none),
+                            "black", "grey55")
+  } else {
+    stop("Modo desconocido: ", modo)
+  }
+  rej
+}
+```
+
+# 3. Las cuatro funciones que hacen todo el trabajo
+
+Solo hay cuatro. Cada una hace un paso y devuelve algo que puedes imprimir y mirar.
+
+```{r funciones}
+# ---------------------------------------------------------------------------
+# (1) Ajustar un modelo mixto.
+#     Los nombres de columna con espacios o paréntesis necesitan comillas
+#     invertidas para ser sintaxis válida de R; esta función se encarga.
+#     rhs = parte derecha de la fórmula: "N + P" (aditivo) o "N * P" (interacción).
+#     reml = FALSE es obligatorio mientras se COMPARAN estructuras de efectos fijos;
+#     reml = TRUE es lo correcto para el modelo final que se reporta.
+# ---------------------------------------------------------------------------
+ajustar <- function(d, columna, rhs, reml = TRUE) {
+  f <- as.formula(paste0("`", columna, "` ~ ", rhs, " + (1 | Block)"))
+  suppressMessages(suppressWarnings(tryCatch(
+    lmer(f, data = d, REML = reml,
+         control = lmerControl(check.conv.singular = "ignore")),
+    error = function(e) NULL
+  )))
+}
+
+# ---------------------------------------------------------------------------
+# (2) Elegir entre modelo aditivo (N + P) e interacción (N * P).
+#     Test de razón de verosimilitud: si añadir la interacción mejora el ajuste
+#     con p < 0.05, se queda "N * P"; si no, gana el modelo más simple.
+#     Devuelve el TEXTO de la fórmula ganadora.
+# ---------------------------------------------------------------------------
+elegir_modelo <- function(d, columna) {
+  m_add <- ajustar(d, columna, "N + P", reml = FALSE)
+  m_int <- ajustar(d, columna, "N * P", reml = FALSE)
+  if (is.null(m_add) || is.null(m_int)) return("N + P")
+  p <- anova(m_add, m_int)$`Pr(>Chisq)`[2]   # fila 2 = el test de comparación
+  if (!is.na(p) && p < 0.05) "N * P" else "N + P"
+}
+
+# ---------------------------------------------------------------------------
+# (3) Medias marginales de las 4 celdas + contrastes de cada una contra el control.
+#
+#     emmeans() calcula la media PREDICHA por el modelo para cada combinación de
+#     N y P, ya teniendo en cuenta el efecto aleatorio de Bloque (no es la media
+#     cruda del grupo).
+#
+#     Los contrastes se construyen a mano, buscando cada celda por sus valores de
+#     N y P, en vez de confiar en el orden de las filas. Un "vector de contraste"
+#     es simplemente una lista de pesos: poner -1 en la fila del control y +1 en la
+#     fila del tratamiento significa "tratamiento menos control".
+#     Así la etiqueta ("N", "P", "N+P") NO PUEDE quedar pegada a la celda equivocada.
+#
+#     Se calculan LOS DOS p-valores del mismo contraste: sin ajustar (idéntico a
+#     summary(modelo) y a las tablas) y corregido por Dunnett. Así la elección de
+#     cuál mostrar es solo una decisión de dibujo, no hay que reajustar nada.
+# ---------------------------------------------------------------------------
+medias_y_contrastes <- function(m) {
+  emm  <- emmeans(m, ~ N * P, at = list(N = c(0, 1), P = c(0, 1)))
+  rej  <- as.data.frame(emm)          # la "rejilla": columnas N, P, emmean, CIs...
+
+  fila <- function(n, p) which(rej$N == n & rej$P == p)
+  stopifnot(length(fila(0, 0)) == 1)  # tiene que haber exactamente una celda control
+
+  pesos <- function(n, p) {
+    v <- rep(0, nrow(rej))
+    v[fila(n, p)]  <-  1     # celda del tratamiento
+    v[fila(0, 0)]  <- -1     # celda del control
+    v
+  }
+
+  metodo <- list("N"   = pesos(1, 0),    # N   vs control
+                 "P"   = pesos(0, 1),    # P   vs control
+                 "N+P" = pesos(1, 1))    # N+P vs control
+
+  # infer = c(TRUE, TRUE) pide a emmeans que devuelva intervalo de confianza Y
+  # p-valor del contraste (por defecto solo devuelve el p).
+  ct_none <- as.data.frame(summary(contrast(emm, method = metodo, adjust = "none"),
+                                   infer = c(TRUE, TRUE)))
+  ct_dunn <- as.data.frame(contrast(emm, method = metodo, adjust = "dunnettx"))
+
+  # Etiqueta legible de cada celda de la rejilla
+  rej$Treatment <- factor(
+    ifelse(rej$N == 0 & rej$P == 0, "C",
+    ifelse(rej$N == 1 & rej$P == 0, "N",
+    ifelse(rej$N == 0 & rej$P == 1, "P", "N+P"))), levels = NIVELES)
+
+  # Pegar a cada celda su contraste contra el control (el control se queda con NA)
+  rej <- left_join(
+    rej,
+    transmute(ct_none, Treatment = factor(as.character(contrast), levels = NIVELES),
+              diff_vs_C = estimate, diff_low = lower.CL, diff_high = upper.CL,
+              p_none = p.value),
+    by = "Treatment"
+  )
+  rej <- left_join(
+    rej,
+    transmute(ct_dunn, Treatment = factor(as.character(contrast), levels = NIVELES),
+              p_dunnett = p.value),
+    by = "Treatment"
+  )
+
+  rej
+}
+
+# ---------------------------------------------------------------------------
+# (4) Un panel de la figura: una especie × una variable.
+#
+#     `limites` es una lista con los cuatro números verticales del panel, calculada
+#     una sola vez por FILA de la figura (ver sección 6) para que todas las especies
+#     de una misma variable compartan el eje Y y sean comparables entre sí.
+#       $ylo       borde inferior del panel
+#       $yhi       borde superior del panel
+#       $y_n       altura de las etiquetas "n=" (dentro de la franja vacía)
+#       $y_datos   por debajo de aquí no hay ningún dato ni intervalo
+# ---------------------------------------------------------------------------
+panel <- function(rej, crudos, limites, etiqueta_y, titulo, con_eje_y,
+                  interaccion, con_eje_x = TRUE) {
+
+  altura <- limites$yhi - limites$ylo
+  media_control <- rej$emmean[rej$Treatment == "C"]
+
+  # Las estrellas van encima del extremo del intervalo, pero sin salirse del panel
+  rej$y_estrella <- pmin(rej$upper.CL + 0.030 * altura,
+                         limites$yhi   - 0.020 * altura)
+
+  # Celdas con pocas observaciones -> etiqueta en la franja reservada de abajo
+  pocas <- filter(rej, n_obs < N_MINIMO)
+
+  p <- ggplot(rej, aes(x = Treatment, y = emmean)) +
+
+    # (a) árboles individuales, en color pálido y con dispersión horizontal
+    geom_jitter(data = crudos, aes(x = Treatment, y = y, colour = Treatment),
+                width = 0.15, height = 0, size = 0.9, alpha = 0.30,
+                inherit.aes = FALSE, show.legend = FALSE) +
+
+    # (b) línea de referencia = media marginal del control
+    geom_hline(yintercept = media_control, colour = "grey62",
+               linetype = "dashed", linewidth = 0.4) +
+
+    # (c) intervalo de confianza 95% de la media marginal
+    geom_linerange(aes(ymin = lower.CL, ymax = upper.CL),
+                   colour = "black", linewidth = 0.5) +
+
+    # (d) la media marginal
+    geom_point(aes(fill = Treatment), shape = 21, size = 3.4,
+               colour = "black", stroke = 0.3) +
+
+    scale_fill_manual(values = fill_trt) +
+    scale_colour_manual(values = dot_trt) +
+    coord_cartesian(ylim = c(limites$ylo, limites$yhi)) +
+    labs(title = titulo, x = NULL, y = etiqueta_y) +
+    theme_linedraw(base_size = 9) +
+    theme(aspect.ratio = 1,
+          plot.title   = element_text(size = 10, face = "italic", hjust = 0.5),
+          axis.text.x  = element_text(size = 10),
+          axis.title.y = element_text(size = 8),
+          panel.grid.minor = element_blank(),
+          legend.position  = "none")
+
+  # (e) asteriscos del contraste contra el control.
+  #     Se dibujan en DOS capas separadas en vez de una sola con color variable:
+  #     así el color es un valor fijo por capa y no interfiere con la escala de
+  #     color de los puntos (scale_colour_manual, que ya está ocupada por los
+  #     tratamientos). En los modos "none" y "dunnettx" la capa gris está vacía.
+  ast_negro <- filter(rej, sig != "", sig_color == "black")
+  ast_gris  <- filter(rej, sig != "", sig_color != "black")
+
+  if (nrow(ast_negro) > 0) {
+    p <- p + geom_text(data = ast_negro,
+                       aes(x = Treatment, y = y_estrella, label = sig),
+                       vjust = 0, size = 3.75, fontface = "bold",
+                       colour = "black", inherit.aes = FALSE)
+  }
+  if (nrow(ast_gris) > 0) {
+    p <- p + geom_text(data = ast_gris,
+                       aes(x = Treatment, y = y_estrella, label = sig),
+                       vjust = 0, size = 3.4, fontface = "bold",
+                       colour = "black", inherit.aes = FALSE)
+  }
+
+  # (f) etiquetas "n=" SOLO donde n < N_MINIMO, en la franja vacía del pie.
+  #     Van por debajo de limites$y_datos, así que no pueden tocar ningún punto.
+  if (nrow(pocas) > 0) {
+    p <- p + geom_text(data = pocas,
+                       aes(x = Treatment, y = limites$y_n, label = paste0("n=", n_obs)),
+                       vjust = 0.5, size = 2.1, colour = "#c0392b", fontface = "bold",
+                       inherit.aes = FALSE)
+  }
+
+  # (g) aviso de que el modelo seleccionado conserva la interacción.
+  #     Va arriba a la IZQUIERDA: el asterisco de N+P está arriba a la derecha.
+  if (interaccion) {
+    p <- p + annotate("text", x = 0.55, y = limites$yhi, label = "N×P",
+                      hjust = 0, vjust = 1.2, size = 2.1,
+                      colour = "grey40", fontface = "italic")
+  }
+
+  if (!con_eje_y) p <- p + theme(axis.text.y = element_blank())
+  if (!con_eje_x) p <- p + theme(axis.text.x = element_blank())   # <- nueva
+
+  p
+}
+```
+
+# 4. Ajustar todos los modelos y guardar sus resultados
+
+Un solo bucle sobre variable × especie. Todo lo que la figura necesita queda
+guardado en una lista, así que **la figura no vuelve a ajustar ningún modelo**
+(en el script anterior los modelos se ajustaban dos veces, una para las tablas y
+otra dentro del bucle de la figura; si algo cambiaba en medio, podían discrepar).
+
+```{r ajustar-todo}
+resultados <- list()
+
+for (i in seq_along(vars_fig)) {
+  columna   <- vars_fig[[i]]        # nombre real de la columna
+  etiqueta  <- names(vars_fig)[i]   # etiqueta con unidades, para el eje Y
+
+  for (sp in names(species_data)) {
+
+    # .data[[columna]] = "usa la columna cuyo nombre está guardado en `columna`"
+    d <- species_data[[sp]] %>% filter(!is.na(.data[[columna]]))
+
+    formula_elegida <- elegir_modelo(d, columna)
+    m <- ajustar(d, columna, formula_elegida, reml = TRUE)
+    if (is.null(m)) { warning("No convergió: ", etiqueta, " / ", sp); next }
+
+    rej <- medias_y_contrastes(m)
+
+    # Observaciones individuales, con su tratamiento etiquetado igual que la rejilla
+    crudos <- d %>%
+      transmute(y = .data[[columna]],
+                Treatment = factor(
+                  ifelse(N == 0 & P == 0, "C",
+                  ifelse(N == 1 & P == 0, "N",
+                  ifelse(N == 0 & P == 1, "P", "N+P"))), levels = NIVELES))
+
+    # Número real de observaciones por celda (esto es lo que se marca en rojo)
+    rej <- left_join(rej, count(crudos, Treatment, name = "n_obs"), by = "Treatment")
+
+    resultados[[paste(etiqueta, sp, sep = " || ")]] <- list(
+      variable = etiqueta, columna = columna, especie = sp,
+      modelo = formula_elegida, m = m, rej = rej, crudos = crudos
+    )
+  }
+}
+
+length(resultados)   # debería ser 7 variables x 6 especies = 42
+```
+
+# 5. Comprobación: ¿los asteriscos coinciden con los coeficientes del modelo?
+
+Esta sección es la que responde a la duda de fondo. Con codificación dummy
+(N y P valen 0 o 1), el coeficiente **P** del modelo *es*, por construcción, la
+diferencia "P menos control". Así que el p-valor del coeficiente y el p-valor del
+contraste que dibuja la figura **tienen que ser el mismo número**. Si algún día no
+lo son, la tabla de abajo lo enseña inmediatamente.
+
+```{r comprobacion}
+comprobacion <- map_dfr(resultados, function(r) {
+  co <- as.data.frame(summary(r$m)$coefficients)
+  co$term <- rownames(co)
+
+  map_dfr(c("N", "P"), function(t) {
+    fila_coef <- co[co$term == t, ]
+    fila_ct   <- r$rej[as.character(r$rej$Treatment) == t, ]
+    if (nrow(fila_coef) == 0 || nrow(fila_ct) == 0) return(NULL)
+    tibble(
+      variable    = r$variable,
+      especie     = r$especie,
+      modelo      = r$modelo,
+      contraste   = t,
+      p_coef      = round(fila_coef$`Pr(>|t|)`, 5),   # p de summary(modelo) / tablas
+      p_sin_ajuste= round(fila_ct$p_none, 5),         # p del contraste, sin ajustar
+      p_dunnett   = round(fila_ct$p_dunnett, 5),      # el mismo contraste, corregido
+      dif_maxima  = round(abs(fila_coef$`Pr(>|t|)` - fila_ct$p_none), 8)
+    )
+  })
+})
+
+cat("Contrastes comprobados:", nrow(comprobacion), "\n")
+cat("Discrepancia máxima entre el p del modelo y el p del contraste sin ajustar:",
+    max(comprobacion$dif_maxima, na.rm = TRUE), "\n")
+
+# Cualquier fila que aparezca aquí es un problema que hay que mirar.
+problemas <- filter(comprobacion, dif_maxima > 1e-6)
+if (nrow(problemas) == 0) {
+  cat("OK: el contraste contra el control reproduce exactamente el coeficiente del",
+      "modelo, asi que la version sin ajustar de la figura coincide con las tablas.\n")
+  cat("(La version Dunnett usa ese mismo contraste, solo con los p corregidos.)\n")
+} else {
+  print(as.data.frame(problemas))
+}
+```
+
+```{r tabla-logP}
+# Los números concretos de logPmass, que eran los que no cuadraban.
+filter(comprobacion, variable == "log LPC (mg g-1)") %>%
+  mutate(simbolo_sin_ajuste = estrellas(p_sin_ajuste),
+         simbolo_dunnett    = estrellas(p_dunnett)) %>%
+  as.data.frame()
+```
+
+```{r tabla-completa}
+# Todos los contrastes de la figura, incluido N+P (que en los modelos con
+# interacción no corresponde a ningún coeficiente único, sino a bN + bP + bN:P).
+contrastes_figura <- map_dfr(resultados, function(r) {
+  r$rej %>%
+    filter(Treatment != "C") %>%
+    transmute(variable = r$variable, especie = r$especie, modelo = r$modelo,
+              contraste = as.character(Treatment),
+              n_obs = n_obs,
+              diferencia         = round(diff_vs_C, 4),
+              p_sin_ajuste       = round(p_none, 4),
+              sig_sin_ajuste     = estrellas(p_none),
+              p_dunnett          = round(p_dunnett, 4),
+              sig_dunnett        = estrellas(p_dunnett))
+})
+
+write.csv(contrastes_figura, "contrasts_vs_control_Bernacchi_EN.csv", row.names = FALSE)
+head(as.data.frame(contrastes_figura), 12)
+```
+
+# 6. La figura
+
+La franja inferior reservada es lo que impide que las etiquetas `n=` toquen los
+puntos: primero se calcula dónde termina el dato más bajo de toda la fila, y luego
+se baja el borde del panel un 10 % extra. Las etiquetas viven en ese hueco, donde por
+construcción no hay nada dibujado.
+
+```{r construir-figura}
+# Toda la figura empaquetada en UNA función.
+#   modo      = qué p-valor se convierte en asteriscos ("none"/"dunnettx"/"ambos")
+#   etiquetas = qué filas se dibujan; por defecto todas. Pasando un subconjunto se
+#               obtiene la figura del texto principal o la del suplementario, con
+#               el mismo código y por tanto con el mismo aspecto.
+construir_figura <- function(modo, etiquetas = names(vars_fig)) {
+
+  set.seed(7)   # geom_jitter() usa azar; la semilla hace la figura reproducible
+  paneles <- list()
+
+  for (i in seq_along(etiquetas)) {
+    etiqueta <- etiquetas[i]
+
+    # --- Límites verticales COMUNES a toda la fila (las 6 especies) ------------
+    # Se usan los datos y los intervalos realmente dibujados, no el rango bruto
+    # de la columna entera, para no arrastrar valores de filas que no se grafican.
+    de_esta_fila <- Filter(function(r) r$variable == etiqueta, resultados)
+
+    y_valores <- c(
+      unlist(lapply(de_esta_fila, function(r) r$crudos$y)),
+      unlist(lapply(de_esta_fila, function(r) r$rej$lower.CL)),
+      unlist(lapply(de_esta_fila, function(r) r$rej$upper.CL))
+    )
+    y_min <- min(y_valores, na.rm = TRUE)
+    y_max <- max(y_valores, na.rm = TRUE)
+    rango <- y_max - y_min
+
+    FRANJA <- 0.10   # 10 % de alto reservado abajo para las etiquetas "n="
+    TECHO  <- 0.14   # 14 % de aire arriba para los asteriscos y el aviso "N×P"
+
+    limites <- list(
+      ylo     = y_min - FRANJA * rango,       # borde inferior del panel
+      yhi     = y_max + TECHO  * rango,       # borde superior del panel
+      y_datos = y_min,                        # por debajo de aquí no hay datos
+      y_n     = y_min - 0.055 * rango         # altura de las etiquetas "n="
+    )
+
+    # --- Un panel por especie -------------------------------------------------
+    for (j in seq_along(species_data)) {
+      sp <- names(species_data)[j]
+      r  <- resultados[[paste(etiqueta, sp, sep = " || ")]]
+      if (is.null(r)) next
+
+      paneles[[length(paneles) + 1]] <- panel(
+        rej         = asteriscos_de(r$rej, modo),      # <- aquí entra el modo
+        crudos      = r$crudos,
+        limites     = limites,
+        etiqueta_y  = if (j == 1) etiqueta else NULL,  # eje Y solo en la 1ª columna
+        titulo      = if (i == 1) sp else NULL,        # especie solo en la 1ª fila
+        con_eje_y   = (j == 1),
+        con_eje_x   = (i == length(etiquetas)),
+        interaccion = identical(r$modelo, "N * P")
+      )
+    }
+  }
+
+  # Línea del pie que explica de dónde salen los asteriscos en este modo
+  linea_sig <- switch(
+    modo,
+    "none" = paste0("Asterisks: contrast against the control from the same model, ",
+                    "uncorrected p-values (identical to the model coefficients)."),
+    "dunnettx" = paste0("Asterisks: contrast against the control, Dunnett-corrected ",
+                        "p-values (3 comparisons vs. control)."),
+    "ambos" = paste0("Asterisks: contrast against the control, uncorrected p-values. ",
+                     "Black = the symbol is unchanged by the Dunnett correction; ",
+                     "grey = the correction weakens or removes it.")
+  )
+
+  wrap_plots(paneles, ncol = length(species_data), nrow = length(etiquetas)) +
+    plot_annotation(
+      title = "Estimated marginal means by treatment, with individual observations",
+      subtitle = paste0(
+        "Large points: marginal mean of the selected model (± 95% CI). ",
+        "Pale points: individual trees. Dashed line: control mean.\n",
+        linea_sig, " († p<0.1, * p<0.05, ** p<0.01, *** p<0.001)\n",
+        "Red n = cells with fewer than ", N_MINIMO, " trees. ",
+        "N×P = the selected model retained the interaction. ",
+        "N blue · P red · N+P grey."),
+      theme = theme(plot.title    = element_text(size = 13, hjust = 0.5),
+                    plot.subtitle = element_text(size = 8, hjust = 0.5, colour = "grey30"))
+    )
+}
+```
+
+```{r guardar-figuras}
+figuras <- list()
+for (modo in MODOS) {
+  figuras[[modo]] <- construir_figura(modo)
+  ggsave(ARCHIVOS[[modo]], figuras[[modo]], width = ANCHO, height = ALTO, dpi = 300)
+  message("Guardado: ", ARCHIVOS[[modo]])
+}
+```
+
+## 6.1 Versión sin ajustar (coincide con las tablas)
+
+```{r fig-none, fig.width=12, fig.height=15}
+figuras[["none"]]
+```
+
+## 6.2 Versión con corrección de Dunnett
+
+```{r fig-dunnett, fig.width=12, fig.height=15}
+figuras[["dunnettx"]]
+```
+
+## 6.3 Versión combinada
+
+Asterisco **negro** = el símbolo es el mismo con y sin corrección de Dunnett.
+Asterisco **gris** = la corrección lo debilita (por ejemplo `**` pasa a `*`) o lo hace
+desaparecer. Es la versión más honesta si quieres enseñar el resultado completo sin
+tener que elegir entre las dos anteriores.
+
+```{r fig-ambos, fig.width=12, fig.height=15}
+figuras[["ambos"]]
+```
+
+# 7. Reparto principal / suplementario
+
+Siete variables × seis especies = 42 paneles es demasiado para el texto principal.
+Aquí se parte la misma figura en dos, usando exactamente el mismo código (solo cambia
+qué filas se piden), así que las dos tienen el mismo aspecto y los mismos números.
+
+Las filas se eligen **por posición**, no reescribiendo la etiqueta: las etiquetas
+llevan caracteres especiales (µ, ²) y volver a teclearlas es justo el error que ya
+costó un fallo silencioso en el script anterior.
+
+```{r reparto}
+names(vars_fig)   # mira aquí los índices antes de cambiar la selección de abajo
+
+# Texto principal: iWUE, ln N, ln P y N:P  (posiciones 1, 2, 4 y 6)
+VARS_PRINCIPAL <- names(vars_fig)[c(1, 2, 4, 6)]
+
+# Suplementario: lo que queda (N_area, P_area, SLA)
+VARS_SUPLEMENTO <- setdiff(names(vars_fig), VARS_PRINCIPAL)
+
+VARS_PRINCIPAL
+VARS_SUPLEMENTO
+```
+
+```{r figuras-manuscrito}
+fig_principal <- construir_figura(MODO_MANUSCRITO, VARS_PRINCIPAL)
+fig_suplemento <- construir_figura(MODO_MANUSCRITO, VARS_SUPLEMENTO)
+
+# El alto se escala con el número de filas para que los paneles queden cuadrados
+alto_por_fila <- ALTO / length(vars_fig)
+
+ggsave("fig_MAIN_emmeans_Bernacchi_EN.png", fig_principal,
+       width = ANCHO, height = alto_por_fila * length(VARS_PRINCIPAL) + 1, dpi = 300)
+ggsave("fig_SUPP_emmeans_Bernacchi_EN.png", fig_suplemento,
+       width = ANCHO, height = alto_por_fila * length(VARS_SUPLEMENTO) + 1, dpi = 300)
+message("Guardadas las figuras del manuscrito.")
+```
+
+```{r ver-principal, fig.width=12, fig.height=10}
+fig_principal
+```
+
+# 8. Cambio porcentual respecto al control (variables log)
+
+Esta figura responde a lo que la de coeficientes no puede: **comparar la magnitud de la
+respuesta entre especies**.
+
+La razón es que las diferencias en escala logarítmica no dependen de las unidades ni del
+nivel de partida de cada especie. Si el modelo estima una diferencia `d` en `log(LPC)`,
+entonces `exp(d)` es el **cociente** entre el tratamiento y el control, y
+`(exp(d) - 1) × 100` es el cambio porcentual. Una especie con 0.4 mg g-1 en el control y
+otra con 0.8 se pueden comparar directamente en esta escala, cosa que con las
+diferencias absolutas no se puede.
+
+Ojo: esto **solo** es válido para las variables que se modelaron en escala log
+(`logNmass`, `logPmass`). Por eso la figura las selecciona por el nombre de la columna
+y no por la etiqueta.
+
+```{r cambio-porcentual, fig.width=9, fig.height=5.5}
+COLUMNAS_LOG <- c("logNmass", "logPmass")
+
+cambio_pct <- map_dfr(resultados, function(r) {
+  if (!(r$columna %in% COLUMNAS_LOG)) return(NULL)
+  r$rej %>%
+    filter(Treatment != "C") %>%
+    transmute(
+      variable  = r$variable,
+      especie   = r$especie,
+      Treatment = Treatment,
+      n_obs     = n_obs,
+      # exp() deshace el log y convierte la diferencia en un cociente
+      pct       = (exp(diff_vs_C)  - 1) * 100,
+      pct_low   = (exp(diff_low)   - 1) * 100,
+      pct_high  = (exp(diff_high)  - 1) * 100,
+      sig       = estrellas(p_none)
+    )
+}) %>%
+  mutate(
+    # rev() para que la primera especie quede arriba del todo en el eje Y
+    especie   = factor(especie, levels = rev(names(species_list))),
+    Treatment = factor(Treatment, levels = c("N", "P", "N+P"))
+  )
+
+write.csv(cambio_pct, "percent_change_vs_control_Bernacchi_EN.csv", row.names = FALSE)
+
+fig_pct <- ggplot(cambio_pct,
+                  aes(x = pct, y = especie, colour = Treatment, shape = Treatment)) +
+  geom_vline(xintercept = 0, colour = "black", linewidth = 0.5) +
+  geom_errorbarh(aes(xmin = pct_low, xmax = pct_high), height = 0.18,
+                 position = position_dodge(width = 0.65), linewidth = 0.6) +
+  geom_point(size = 2.4, position = position_dodge(width = 0.65)) +
+  geom_text(aes(label = sig, x = pct_high), hjust = -0.35, vjust = 0.5,
+            size = 3, fontface = "bold", colour = "black", show.legend = FALSE,
+            position = position_dodge(width = 0.65)) +
+  scale_colour_manual(values = c("N" = C_N, "P" = C_P, "N+P" = C_NP)) +
+  scale_shape_manual(values = c("N" = 16, "P" = 15, "N+P" = 17)) +
+  scale_x_continuous(expand = expansion(mult = c(0.05, 0.14))) +
+  facet_wrap(~ variable, scales = "free_x") +
+  labs(x = "Change relative to the control (%, ± 95% CI)",
+       y = NULL, colour = NULL, shape = NULL,
+       title = "Treatment effect on leaf N and P, expressed as % change vs. control",
+       caption = paste("Back-transformed from the log-scale model contrasts, so values",
+                       "are comparable across species.\n",
+                       "† p<0.1, * p<0.05, ** p<0.01, *** p<0.001 (uncorrected).")) +
+  theme_bw(base_size = 10) +
+  theme(axis.text.y = element_text(face = "italic"),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(size = 9),
+        legend.position = "bottom",
+        plot.title = element_text(size = 11))
+
+ggsave("fig_percent_change_Bernacchi_EN.png", fig_pct, width = 9, height = 5.5, dpi = 300)
+fig_pct
+```
+
+```{r tabla-cambio-porcentual}
+# La misma información en números, redondeada, para el texto o el suplementario.
+cambio_pct %>%
+  filter(variable == "log LPC (mg g-1)", Treatment == "P") %>%
+  transmute(especie, n_obs,
+            `cambio %` = round(pct, 1),
+            `IC 95%` = sprintf("[%.1f, %.1f]", pct_low, pct_high),
+            sig) %>%
+  as.data.frame()
+```
+
+# 9. Session info
+
+```{r session}
+sessionInfo()
+```

@@ -1,0 +1,363 @@
+---
+title: "Trait variation among species — one-way ANOVA on control trees (Bernacchi dataset)"
+author: "Andrea Chávez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Para qué sirve este archivo
+
+Reemplaza a `01SpeciesanalysisANOVAS.Rmd`. Hace lo mismo — comparar rasgos **entre
+especies** en los árboles control, con ANOVA de una vía + Tukey y letras de
+significancia — pero con las unidades homogeneizadas con el resto del manuscrito y
+partido en **dos figuras**: una principal y una suplementaria.
+
+Textos de la figura en inglés; comentarios del código en español.
+
+## Qué se corrigió respecto al cuaderno anterior
+
+**1. Unidades y etiquetas.** Antes cada panel llevaba su propia etiqueta escrita a
+mano (`"Leaf N (mg/g)"`, `"N area"`, `"P_area"`, `"N:P"`), distinta de la que usan las
+otras figuras del manuscrito y en dos casos sin unidad. Aquí las etiquetas se definen
+**una sola vez** en el vector `vars_*` y se reutilizan en el eje, en la tabla y en el
+nombre del archivo, exactamente igual que en `03_emmeans_figure_Bernacchi_EN.Rmd`.
+
+**2. `LA` no es "Leaf area (cm²)".** El Excel tiene dos columnas parecidas y se estaban
+confundiendo:
+
+| Columna              | Qué es                                          | Rango       |
+|----------------------|-------------------------------------------------|-------------|
+| `Leaf area (cm²)`    | área **total** de la muestra (~20 hojas)         | 24 – 2367   |
+| `LA`                 | `Leaf area / number of leaves` = área de **una** hoja | 1.2 – 118   |
+
+Verificado sobre los datos: `LA = Leaf area (cm²) / number of leaves` en todas las
+filas. La etiqueta correcta para `LA` es **"Individual leaf area (cm²)"**, no
+"Leaf area (cm²)". Conviene arreglar también `vars_morpho` en
+`02_Species_analysis_dummies_Bernacchi_EN.Rmd`, donde tiene la etiqueta antigua.
+
+**3. Dataset.** El cuaderno viejo leía `data_for_R.xlsx` y usaba el iWUE antiguo
+(`iWUE (μmol/mol)`). Aquí se usa `data_for_R_Bernacchi.xlsx` y `iWUE_Bernacchi`, que es
+la versión del manuscrito.
+
+**4. Nombres de especie.** Los niveles estaban escritos a mano con dobles espacios y
+erratas (`"Clarisia  racemosa"`, `"Weinmania  loxensis"`, `"Hedyosmun  purpurascens"`)
+que no coinciden con los datos: esas filas se habrían convertido en `NA` en silencio.
+Aquí se usa `species_label` y el script **aborta** si algún nombre no cuadra.
+
+**5. El chunk `grafico individual` no podía correr:** llamaba a `multcompLetters4(anova,
+tukey)` con dos objetos que no existían en ese punto. Esa figura suelta se eliminó; la
+hace `make_panel()` como una más.
+
+**6. LMA se omite.** `LMA g/m2` es exactamente `10000 / SLA` (verificado), así que
+graficarla junto a SLA es repetir el mismo dato dos veces.
+
+---
+
+```{r librerias}
+library(readxl)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(patchwork)
+library(multcompView)   # letras de significancia a partir de Tukey
+```
+
+# 1. Opciones
+
+```{r opciones}
+ARCHIVO <- "data_for_R_Bernacchi.xlsx"
+
+# TRUE  = comparar especies usando SOLO los árboles control (diseño original:
+#         "cómo son las especies sin fertilizar").
+# FALSE = usar todos los árboles. Da mucha más potencia, pero entonces la
+#         comparación entre especies incluye el efecto de los tratamientos.
+SOLO_CONTROLES <- TRUE
+
+ALFA <- 0.05   # umbral para las letras de Tukey
+
+# Rampa secuencial para la elevación: un solo tono, de claro a oscuro.
+# Es lo correcto para una variable ordenada (1000 < 2000 < 3000 m); una paleta
+# de colores distintos sugeriría categorías sin orden.
+col_elev <- c("1000" = "#c7e9c0", "2000" = "#74c476", "3000" = "#238b45")
+```
+
+# 2. Datos
+
+```{r datos}
+data <- read_excel(ARCHIVO, sheet = "data")
+
+# Igual que en el resto de cuadernos: nunca se teclea un nombre de columna con
+# caracteres especiales (μ, ², ‰, δ); se busca por un patrón ASCII y se exige que
+# encuentre exactamente una columna.
+col_por_patron <- function(patron) {
+  hit <- grep(patron, names(data), value = TRUE)
+  if (length(hit) != 1) {
+    stop("El patrón '", patron, "' encontró ", length(hit),
+         " columnas (debe encontrar 1): ", paste(hit, collapse = " | "))
+  }
+  hit
+}
+
+COL_iWUE  <- col_por_patron("^iWUE_Bernacchi")
+COL_d13C  <- col_por_patron("^.13C \\(")        # δ13C celulosa, no el bulk_δ13C
+COL_SLA   <- col_por_patron("^Specific leaf area")
+COL_THICK <- col_por_patron("^thickness")
+COL_PUNCH <- col_por_patron("^force to punch")
+COL_LA    <- col_por_patron("^LA$")             # área de UNA hoja (ver notas arriba)
+COL_DMC   <- col_por_patron("^dry matter content")
+
+c(iWUE = COL_iWUE, d13C = COL_d13C, SLA = COL_SLA, thickness = COL_THICK,
+  punch = COL_PUNCH, leaf_area = COL_LA, DMC = COL_DMC)
+```
+
+```{r especies}
+# Orden: por elevación creciente, y dentro de cada elevación las dos especies.
+# Es el mismo orden que usan las demás figuras del manuscrito.
+species_list <- list(
+  "P. torta"        = "Pouteria torta",
+  "C. racemosa"     = "Clarisia racemosa",
+  "A. lojaensis"    = "Alchornea lojaensis",
+  "Myrcia sp. nov." = "Myrcia sp nov",
+  "H. purpurascens" = "Hedyosmum purpurascens",
+  "W. loxensis"     = "Weinmannia loxensis"
+)
+
+elevacion <- c("P. torta" = 1000, "C. racemosa" = 1000,
+               "A. lojaensis" = 2000, "Myrcia sp. nov." = 2000,
+               "H. purpurascens" = 3000, "W. loxensis" = 3000)
+
+# Aborta si algún nombre de species_list no existe en los datos (esto es lo que
+# fallaba en silencio en el cuaderno anterior).
+faltan <- setdiff(unlist(species_list), unique(data$species_label))
+if (length(faltan) > 0) stop("Nombres que no están en species_label: ",
+                             paste(faltan, collapse = " | "))
+
+d <- data %>%
+  filter(species_label %in% unlist(species_list)) %>%
+  mutate(
+    Species   = factor(names(species_list)[match(species_label, unlist(species_list))],
+                       levels = names(species_list)),
+    Elevation = factor(elevacion[as.character(Species)], levels = c(1000, 2000, 3000))
+  )
+
+if (SOLO_CONTROLES) d <- filter(d, Sub == "C")
+
+cat("Árboles usados:", nrow(d), if (SOLO_CONTROLES) "(solo controles)" else "(todos)", "\n")
+table(Species = d$Species, Elevation = d$Elevation)
+```
+
+```{r variables}
+# Etiqueta (con unidad) = nombre;  columna real del Excel = valor.
+# Estas etiquetas son las MISMAS que en 03_emmeans_figure_Bernacchi_EN.Rmd.
+
+vars_main <- c(
+  "iWUE, Bernacchi (µmol mol-1)"        = COL_iWUE,
+  "d13C cellulose (per mil vs V-PDB)"   = COL_d13C,
+  "N content, mass-based (mg g-1 DM)"   = "LNC",
+  "N content, area-based (g m-2)"       = "N_area",
+  "P content, mass-based (mg g-1 DM)"   = "LPC",
+  "P content, area-based (g m-2)"       = "P_area",
+  "Leaf N:P ratio (mass-based)"         = "N:P"
+)
+
+vars_morpho <- c(
+  "SLA (cm² g-1)"                       = COL_SLA,
+  "Leaf thickness (mm)"                 = COL_THICK,
+  "Punch force (kN m-1)"                = COL_PUNCH,
+  "Individual leaf area (cm²)"          = COL_LA,
+  "Leaf dry matter content (mg g-1)"    = COL_DMC
+)
+
+stopifnot(all(c(vars_main, vars_morpho) %in% names(d)))
+```
+
+# 3. Las tres funciones
+
+```{r funciones}
+# ---------------------------------------------------------------------------
+# (1) ANOVA de una vía entre especies + Tukey + letras compactas.
+#     Las "letras compactas" (compact letter display) resumen todas las
+#     comparaciones por pares: dos especies que comparten una letra NO son
+#     distinguibles al nivel ALFA; si no comparten ninguna, difieren.
+# ---------------------------------------------------------------------------
+anova_especies <- function(datos, columna) {
+  dd <- datos %>%
+    transmute(Species, Elevation, valor = .data[[columna]]) %>%
+    filter(!is.na(valor)) %>%
+    droplevels()
+
+  mod   <- aov(valor ~ Species, data = dd)
+  tuk   <- TukeyHSD(mod, "Species")
+  letras <- multcompLetters4(mod, tuk, threshold = ALFA)$Species$Letters
+
+  cld <- tibble(Species = names(letras), letra = unname(letras)) %>%
+    mutate(Species = factor(Species, levels = levels(dd$Species)))
+
+  list(datos = dd, modelo = mod, tukey = tuk, cld = cld)
+}
+
+# ---------------------------------------------------------------------------
+# (2) Resumen numérico de un ANOVA, para la tabla de resultados.
+#     Se añaden dos comprobaciones que el cuaderno anterior hacía sueltas:
+#     Shapiro (normalidad de los residuos) y Kruskal-Wallis (prueba no
+#     paramétrica). Si el ANOVA y Kruskal-Wallis coinciden, la conclusión no
+#     depende del supuesto de normalidad.
+# ---------------------------------------------------------------------------
+resumen_anova <- function(res, etiqueta) {
+  s  <- summary(res$modelo)[[1]]
+  kw <- kruskal.test(valor ~ Species, data = res$datos)
+  tibble(
+    variable   = etiqueta,
+    n          = nrow(res$datos),
+    df_especie = s$Df[1], df_resid = s$Df[2],
+    F_valor    = round(s$`F value`[1], 2),
+    p_anova    = signif(s$`Pr(>F)`[1], 3),
+    p_shapiro  = signif(shapiro.test(residuals(res$modelo))$p.value, 3),
+    p_kruskal  = signif(kw$p.value, 3),
+    letras     = paste(paste0(res$cld$Species, ":", res$cld$letra), collapse = "  ")
+  )
+}
+
+# ---------------------------------------------------------------------------
+# (3) Un panel: boxplot por especie, puntos individuales encima, letra de Tukey
+#     arriba de cada caja. Se reserva un 12 % de aire arriba para que las letras
+#     nunca queden pegadas al borde ni encima de un punto.
+# ---------------------------------------------------------------------------
+make_panel <- function(res, etiqueta, eje_x = TRUE) {
+  dd  <- res$datos
+  rng <- range(dd$valor, na.rm = TRUE)
+  aire <- 0.12 * diff(rng)
+
+  alturas <- dd %>%
+    group_by(Species) %>%
+    summarise(y = max(valor, na.rm = TRUE), .groups = "drop")
+  cld <- left_join(res$cld, alturas, by = "Species")
+
+  p <- ggplot(dd, aes(x = Species, y = valor)) +
+    geom_boxplot(aes(fill = Elevation), outlier.shape = NA,
+                 linewidth = 0.35, colour = "grey25", alpha = 0.85) +
+    geom_jitter(width = 0.14, height = 0, size = 1.1, alpha = 0.45,
+                colour = "grey20") +
+    geom_text(data = cld, aes(x = Species, y = y + 0.045 * diff(rng), label = letra),
+              size = 3, fontface = "bold", vjust = 0, colour = "grey15") +
+    scale_fill_manual(values = col_elev, name = "Elevation (m)") +
+    coord_cartesian(ylim = c(rng[1] - 0.05 * diff(rng), rng[2] + aire)) +
+    labs(x = NULL, y = etiqueta) +
+    theme_bw(base_size = 9) +
+    theme(panel.grid.major.x = element_blank(),
+          panel.grid.minor   = element_blank(),
+          axis.title.y = element_text(size = 8),
+          legend.position = "bottom")   # patchwork recoge y unifica las leyendas
+
+  if (eje_x) {
+    p <- p + theme(axis.text.x = element_text(angle = 45, hjust = 1,
+                                              face = "italic", size = 7.5))
+  } else {
+    p <- p + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  }
+  p
+}
+```
+
+# 4. Resultados numéricos
+
+```{r correr}
+correr_grupo <- function(vars) {
+  map(seq_along(vars), function(i) {
+    res <- anova_especies(d, vars[[i]])
+    list(etiqueta = names(vars)[i], res = res)
+  })
+}
+
+grupo_main   <- correr_grupo(vars_main)
+grupo_morpho <- correr_grupo(vars_morpho)
+
+tabla <- bind_rows(
+  map_dfr(grupo_main,   function(g) resumen_anova(g$res, g$etiqueta)) %>%
+    mutate(grupo = "Physiological / nutrients"),
+  map_dfr(grupo_morpho, function(g) resumen_anova(g$res, g$etiqueta)) %>%
+    mutate(grupo = "Morphological")
+) %>%
+  select(grupo, everything())
+
+write.csv(tabla, "species_ANOVA_controls_Bernacchi_EN.csv", row.names = FALSE)
+as.data.frame(tabla)
+```
+
+```{r tukey-morfologia}
+# Comparaciones por pares completas de los rasgos morfológicos: es de donde
+# salen las frases de resultados.
+for (g in grupo_morpho) {
+  cat("\n=====", g$etiqueta, "=====\n")
+  print(round(g$res$tukey$Species, 4))
+}
+```
+
+# 5. Figuras
+
+## 5.1 Figura principal — fisiología y nutrientes
+
+```{r fig-main, fig.width=8.5, fig.height=11}
+paneles_main <- map(seq_along(grupo_main), function(i) {
+  # Solo la última fila de la rejilla lleva los nombres de especie en el eje X
+  ultima_fila <- i > (length(grupo_main) - 2)
+  make_panel(grupo_main[[i]]$res, grupo_main[[i]]$etiqueta, eje_x = ultima_fila)
+})
+
+fig_main <- wrap_plots(paneles_main, ncol = 2, guides = "collect") +
+  plot_annotation(
+    tag_levels = "A",
+    title = "Trait variation among species (control trees)",
+    subtitle = paste0(
+      "One-way ANOVA per trait; letters are Tukey HSD groups at p < ", ALFA,
+      " (species sharing a letter are not distinguishable).\n",
+      "Boxes shaded by elevation. Points are individual trees."),
+    theme = theme(plot.title    = element_text(size = 12, hjust = 0.5),
+                  plot.subtitle = element_text(size = 8, hjust = 0.5, colour = "grey30"),
+                  legend.position = "bottom")
+  )
+
+ggsave("fig_MAIN_species_controls_Bernacchi_EN.png", fig_main,
+       width = 8.5, height = 11, dpi = 300, bg = "white")
+fig_main
+```
+
+## 5.2 Figura suplementaria — rasgos morfológicos
+
+```{r fig-supp, fig.width=8.5, fig.height=8.5}
+paneles_morpho <- map(seq_along(grupo_morpho), function(i) {
+  ultima_fila <- i > (length(grupo_morpho) - 2)
+  make_panel(grupo_morpho[[i]]$res, grupo_morpho[[i]]$etiqueta, eje_x = ultima_fila)
+})
+
+fig_supp <- wrap_plots(paneles_morpho, ncol = 2, guides = "collect") +
+  plot_annotation(
+    tag_levels = "A",
+    title = "Leaf morphological traits among species (control trees)",
+    subtitle = paste0(
+      "One-way ANOVA per trait; letters are Tukey HSD groups at p < ", ALFA,
+      " (species sharing a letter are not distinguishable).\n",
+      "Boxes shaded by elevation. Points are individual trees."),
+    theme = theme(plot.title    = element_text(size = 12, hjust = 0.5),
+                  plot.subtitle = element_text(size = 8, hjust = 0.5, colour = "grey30"),
+                  legend.position = "bottom")
+  )
+
+ggsave("fig_SUPP_species_controls_morphology_Bernacchi_EN.png", fig_supp,
+       width = 8.5, height = 8.5, dpi = 300, bg = "white")
+fig_supp
+```
+
+# 6. Session info
+
+```{r session}
+sessionInfo()
+```

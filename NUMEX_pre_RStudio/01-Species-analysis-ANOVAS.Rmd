@@ -70,8 +70,6 @@ data <- dplyr::select(data,
 # ANOVA
 Tendencias generales
 
-
-
 ```{r ANOVA }
 #global ANOVA for control
 controles <- data %>%
@@ -83,21 +81,40 @@ controles$elevation_m <- as.factor(controles$elevation_m)
 controles$name <- as.factor(controles$name)
   
 #anova <- aov( `iWUE (μmol/mol)`~ elevation_m, data = controles)
-anova <- aov( `LNC`~ elevation_m, data = controles) #Uses all dataset. Interaction between species and treatment
+anova_LNC <- aov( `LNC`~ name, data = controles) #Uses all dataset.
+anova_LPC <- aov( `LPC`~ name, data = controles) #Uses all dataset.
+anova_iWUE <- aov(`iWUE (μmol/mol)` ~ name, data = controles)
+anova_Pa <- aov( `P_area`~ name, data = controles) #Uses all dataset.
+anova_Na <- aov( `N_area`~ name, data = controles) #Uses all dataset.
+anova_d13C <- aov(`δ13C (‰ v.s.V-PDB)` ~ name, data = controles)
+
 #Uses all dataset. Interaction between species and treatment
-summary(anova)
+summary(anova_LNC)
+summary(anova_LPC)
+summary(anova_iWUE)
+summary(anova_Pa)
+summary(anova_Na)
+summary(anova_d13C)
 
-TukeyHSD(anova, "elevation_m")
+TukeyHSD(anova_LNC, "name")
+TukeyHSD(anova_LPC, "name")
+TukeyHSD(anova_iWUE, "name")
+TukeyHSD(anova_Pa, "name")
+TukeyHSD(anova_Na, "name")
+TukeyHSD(anova_d13C, "name")
 
-shapiro.test(residuals(anova))
+shapiro.test(residuals(anova_LNC))
+shapiro.test(residuals(anova_LPC))
+shapiro.test(residuals(anova_iWUE))
+shapiro.test(residuals(anova_Pa))
+shapiro.test(residuals(anova_Na))
+shapiro.test(residuals(anova_d13C))
 ```
-
-```{r ANOVA }
+# Grafico individual
+```{r grafico individual }
 
 library(multcompView)
 library(dplyr)
-shapiro.test(residuals(anova))
-tukey <- TukeyHSD(anova)
 
 # Orden deseado
 controles$name <- factor(
@@ -117,10 +134,8 @@ controles$name <- factor(
 
 controles <- controles %>%
   rename(iWUE = `iWUE (μmol/mol)`)
-
-anova <- aov(iWUE ~ name, data = controles)
-
-tukey <- TukeyHSD(anova)
+controles <- controles %>%
+  rename(d13C = `δ13C (‰ v.s.V-PDB)`)
 
 letters <- multcompLetters4(anova, tukey)
 
@@ -159,72 +174,77 @@ ggplot(controles, aes(x = name, y = iWUE)) +
 ```
 
 Resultados del ANOVA una sola via especie:
-### LNC 
+LNC 
 Between especies, especies at 1000 m, Clarisia and Pouteria are similar to each other (p-value = 0.20). Weinmania and Hedyosmum although being in the same elevation are different (p-value = 0.0007784). Myrcia and Alchornea are different too. (p=0.008). 
 ### Narea. At mid elevation the highest Narea. High N levels at low levels are not being traslated into high Narea.Leaves are bigger at low elevations.At high elevations leaves are smaller but it is not traslated into bigger Narea.
 
-### iWUE
+iWUE
 Species at 1000 share similar iWUE. Myrcia and Alchornea are slightly different between them. Species at 2000 and 3000 are similar to each other.
 
-### LPC 
+LPC 
 Not pattern with elevation.P_area slightly higher at mid elevation with Alchornea taking up more. 
+# graficos
 ```{r}
 library(dplyr)
 library(ggplot2)
 library(multcompView)
 library(patchwork)
 
-# Función para generar cada gráfico
-make_plot <- function(data, variable, ylab){
 
+make_plot <- function(data, variable, ylab, ylim = NULL, label_offset = NULL){
   datos <- data %>%
     rename(valor = all_of(variable))
-
   anova <- aov(valor ~ name, data = datos)
   tukey <- TukeyHSD(anova)
-
   letters <- multcompLetters4(anova, tukey)
-
   cld <- data.frame(
     name = names(letters$name$Letters),
     letra = letters$name$Letters
   )
-
+  
+  # si no se especifica offset, usar 2.5% del rango de los datos
+  if (is.null(label_offset)) {
+    rango <- max(datos$valor, na.rm = TRUE) - min(datos$valor, na.rm = TRUE)
+    label_offset <- rango * 0.05
+  }
+  
   maximos <- datos %>%
     group_by(name) %>%
-    summarise(y = max(valor, na.rm = TRUE),
-              .groups = "drop")
-
+    summarise(y = max(valor, na.rm = TRUE), .groups = "drop")
   cld <- left_join(cld, maximos, by = "name")
-
-  ggplot(datos, aes(x = name, y = valor)) +
+  
+  p <- ggplot(datos, aes(x = name, y = valor)) +
     geom_boxplot() +
     geom_jitter(width = 0.15, alpha = 0.6, size = 2) +
     geom_text(
       data = cld,
-      aes(x = name, y = y + 2.5, label = letra),
+      aes(x = name, y = y + label_offset, label = letra),
       size = 3,
       fontface = "bold"
     ) +
-    theme_bw() +
-    labs(
-      x = NULL,
-      y = ylab
-    ) +
+    theme_bw(base_size = 12) +
+    labs(x = NULL, y = ylab) +
     theme(
-      axis.text.x = element_text(
-        angle = 45,
-        hjust = 1,
-        face = "italic"
-      )
+      axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
     )
+  
+  if (!is.null(ylim)) {
+    p <- p + coord_cartesian(ylim = ylim)
+  }
+  
+  return(p)
 }
 
 # Crear gráficos
 p1 <- make_plot(controles, "iWUE", "iWUE (µmol mol⁻¹)")
-p2 <- make_plot(controles, "N_P", "N:P")
+p2 <- make_plot(controles, "d13C", "δ13C (‰ v.s.V-PDB)")
 p3 <- make_plot(controles, "LNC", "Leaf N (mg/g)")
-p4 <- make_plot(controles, "LPC", "Leaf P (mg/g)")
+p4 <- make_plot(controles, "N_area", "N area")
+
+p5 <- make_plot(controles, "LPC", "Leaf P (mg/g)")
+p6 <- make_plot(controles, "P_area", "P_area", ylim = c(0, 0.5), label_offset = 0.03)
+
+p7 <- make_plot(controles, "N:P", "N:P")
 
 p1 <- p1 +
   theme(
@@ -240,9 +260,35 @@ p2 <- p2 +
     axis.ticks.x = element_blank()
   )
 
+p3 <- p3 +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
 
-((p1 + p2) /
- (p3 + p4)) +plot_annotation(tag_levels = "A")
+p4 <- p4 +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+
+figura_final <- ((p1 + p2) /
+                  (p3 + p4) /
+                  (p5 + p6)) +
+  plot_annotation(tag_levels = "A")
+
+ggsave(
+  filename = "figura_controles.png",
+  plot = figura_final,
+  width = 180,     # mm (A4 = 210mm, dejamos márgenes)
+  height = 240,    # mm (A4 = 297mm)
+  units = "mm",
+  dpi = 600,       # 300 mínimo, 600 recomendado para revistas
+  bg = "white"
+)
 ```
 
 
@@ -252,9 +298,9 @@ library(tidyr)
 library(ggplot2)
 
 datos_long <- controles %>%
-  select(name, iWUE, N_P, LNC, LPC) %>%
+  select(name, iWUE, "N:P", LNC, LPC) %>%
   pivot_longer(
-    cols = c(iWUE, N_P, LNC, LPC),
+    cols = c(iWUE,"N:P", LNC, LPC),
     names_to = "Variable",
     values_to = "Valor"
   )

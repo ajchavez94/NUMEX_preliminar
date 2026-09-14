@@ -101,7 +101,7 @@ sub_colors <- c(
 
 
 ```{r}
-ggplot(data, aes(N_area, `iWUE (μmol/mol)`)) +
+ggplot(data, aes(LPC, `iWUE (μmol/mol)`)) +
   
   geom_point(aes(fill= Treatment),
              shape = 21,
@@ -221,7 +221,7 @@ sma6 <-sma(`iWUE (μmol/mol)`~ `Specific leaf area (cm²/g)`, data = datos_Weinm
 summary(sma6)
 ```
 ```{r}
-ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
+ggplot(data, aes(`Specific leaf area (cm²/g)`, `iWUE (μmol/mol)`)) +
   
   geom_point(aes(fill= Treatment),
              shape = 21,
@@ -237,7 +237,7 @@ ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
     values = sub_colors)+
   facet_wrap(~name,nrow = 1)  +
   labs(
-    x = "Parea",
+    x = "SLA (cm²/g)` ",
     y = "iWUE (μmol/mol)",
   ) +
   theme(legend.position = "bottom",
@@ -247,7 +247,7 @@ ggplot(data, aes(`K (mg/g)`, `iWUE (μmol/mol)`)) +
   )
 
 ggsave(
-  "Parea_iWUE_SMA.png",
+  "SLA_iWUE_SMA.png",
   width = 180,      # mm
   height = 70,      # mm
   units = "mm",
@@ -256,7 +256,7 @@ ggsave(
 ```
 
 ```{r}
-ggplot(data, aes(`P_area`, `iWUE (μmol/mol)`)) +
+ggplot(data, aes(`N_area`, `iWUE (μmol/mol)`)) +
   
   geom_point(aes(fill= Treatment),
              shape = 21,
@@ -272,7 +272,7 @@ ggplot(data, aes(`P_area`, `iWUE (μmol/mol)`)) +
     values = sub_colors)+
   facet_wrap(~name,nrow = 1)  +
   labs(
-    x = "Parea",
+    x = "Narea",
     y = "iWUE (μmol/mol)",
   ) +
   theme(legend.position = "bottom",
@@ -282,7 +282,7 @@ ggplot(data, aes(`P_area`, `iWUE (μmol/mol)`)) +
   )
 
 ggsave(
-  "Parea_iWUE_SMA.png",
+  "Narea_iWUE_SMA.png",
   width = 180,      # mm
   height = 70,      # mm
   units = "mm",

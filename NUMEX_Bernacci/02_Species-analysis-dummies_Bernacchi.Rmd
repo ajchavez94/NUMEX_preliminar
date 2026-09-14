@@ -1,0 +1,689 @@
+---
+title: "Análisis por especie — modelos dummies (dataset Bernacchi)"
+author: "Andrea Chávez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 11, fig.height = 7)
+```
+
+# Notas sobre esta versión
+
+Adaptación de `02_Species-analysis-dummies.Rmd` al archivo `data_for_R_Bernacchi.xlsx`.
+Cambios respecto al original:
+
+**Datos**
+
+- Lee la hoja `data` de `data_for_R_Bernacchi.xlsx`.
+- Se añaden `iWUE_Bernacchi (μmol/mol)` y `CiCa_Bernacchi` como respuestas, **conservando**
+  `iWUE (μmol/mol)` y `Ci/Ca` para comparación directa.
+- El filtrado por especie usa `species_label`, no `genus`. En el archivo original los géneros
+  tenían espacios finales (`"Weinmania "`, `"Hedyosmun "`, `"Clarisia "`) y `genus` era `NA`
+  para *Alchornea* y *Myrcia*, de modo que los filtros por `genus` eran frágiles.
+
+**Errores corregidos del original**
+
+1. Dos chunks se llamaban `{r aditivo}`. Knitr aborta con nombres duplicados.
+2. En `variables <- c("iWUE (µmol/mol)", ...)` el carácter `µ` era MICRO SIGN (U+00B5)
+   mientras que el nombre de columna usa GREEK SMALL LETTER MU (U+03BC). La selección de
+   modelos fallaba silenciosamente para iWUE.
+3. Los chunks de interacción llamaban `summary(mod_logNmass_pt)` y `summary(mod_SLA_pt)`
+   antes de que esos objetos existieran (se definen en los chunks aditivos posteriores).
+4. En `models_N_graphic`, las seis entradas `"Parea | ..."` apuntaban a `mod_Narea_*`.
+5. `theme(base_size = 14, ...)` en el bloque final: `theme()` no acepta `base_size`.
+6. En el mismo bloque, `panel.grid.major = element_line(...)` quedaba fuera de `theme()`
+   por un paréntesis mal cerrado, y no tenía ningún efecto.
+7. `geom_linerange()` no acepta `width`.
+8. `plot_coefs()` usa `broom.mixed::tidy()` pero `broom.mixed` no estaba en las librerías.
+9. `data` se filtraba con `dplyr::select()` sin incluir `Bloque` como factor ni las
+   columnas nuevas.
+
+**Estructura**
+
+Los bloques de ~200 líneas de copia y pega se sustituyen por bucles sobre
+especie × variable. Los resultados son idénticos y añadir una variable es una línea.
+
+---
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(broom.mixed)
+library(emmeans)
+library(ggplot2)
+library(patchwork)
+library(openxlsx)
+library(knitr)
+library(kableExtra)
+library(modelsummary)
+library(flextable)
+library(performance)   # R2 marginal y condicional (Nakagawa & Schielzeth)
+```
+
+```{r datos}
+data <- read_excel("data_for_R_Bernacchi.xlsx", sheet = "data")
+
+data <- data %>%
+  mutate(
+    logNmass = log(LNC),
+    logPmass = log(LPC),
+    logCmass = log(LCC),
+    SUB      = Sub,
+    Bloque   = factor(Bloque)
+  )
+
+# Comprobacion: sin espacios sobrantes en los identificadores de texto
+stopifnot(all(data$species_label == trimws(data$species_label)))
+table(data$species_label, data$Sub)
+```
+
+```{r especies}
+especies <- list(
+  "P. torta"        = "Pouteria torta",
+  "C. racemosa"     = "Clarisia racemosa",
+  "A. lojaensis"    = "Alchornea lojaensis",
+  "Myrcia sp. nov." = "Myrcia sp nov",
+  "H. purpurascens" = "Hedyosmum purpurascens",
+  "W. loxensis"     = "Weinmannia loxensis"
+)
+
+elevacion <- c("P. torta" = 1000, "C. racemosa" = 1000,
+               "A. lojaensis" = 2000, "Myrcia sp. nov." = 2000,
+               "H. purpurascens" = 3000, "W. loxensis" = 3000)
+
+datos_esp <- lapply(especies, function(sp) dplyr::filter(data, species_label == sp))
+sapply(datos_esp, nrow)
+```
+
+```{r grupos de variables}
+vars_fisio <- c(
+  "iWUE original"    = "iWUE (μmol/mol)",
+  "iWUE Bernacchi"   = "iWUE_Bernacchi (μmol/mol)",
+  "d13C celulosa"    = "δ13C (‰ v.s.V-PDB)",
+  "Ci/Ca original"   = "Ci/Ca",
+  "Ci/Ca Bernacchi"  = "CiCa_Bernacchi",
+  "d18O"             = "δ18O in ‰ vs DeltaSMOW"
+)
+
+vars_morfo <- c(
+  "SLA"          = "Specific leaf area (cm²/g)",
+  "Grosor"       = "thickness (mm)",
+  "Dureza"       = "force to punch (kN/m)",
+  "Area foliar"  = "LA",
+  "DMC"          = "dry matter content (mg/g)"
+)
+
+vars_nutri <- c(
+  "N masa" = "LNC", "log N masa" = "logNmass", "N area" = "N_area",
+  "P masa" = "LPC", "log P masa" = "logPmass", "P area" = "P_area",
+  "C masa" = "LCC", "log C masa" = "logCmass", "C area" = "C_area",
+  "N:P foliar" = "N:P", "C:N foliar" = "C:N"
+)
+```
+
+# Paleta del proyecto
+
+`N` en azul, `P` en rojo, `N+P` en gris. Se define una sola vez y se reutiliza en todas
+las figuras, de modo que cambiar el esquema aquí lo propaga a todo el documento.
+
+```{r paleta}
+C_N  <- "#2c6fbb"   # azul
+C_P  <- "#c0392b"   # rojo
+C_NP <- "#7f7f7f"   # gris
+C_C  <- "#ffffff"   # control, relleno blanco
+
+sub_colors  <- c("C" = C_C, "N" = C_N, "P" = C_P, "N+P" = C_NP)
+raw_colors  <- c("C" = "#9a9a9a", "N" = C_N, "P" = C_P, "N+P" = "#6f6f6f")
+term_colors <- c("N" = C_N, "P" = C_P, "N:P" = C_NP, "N\u00d7P" = C_NP)
+
+estrellas <- function(p) {
+  dplyr::case_when(is.na(p) ~ "", p < 0.001 ~ "***", p < 0.01 ~ "**",
+                   p < 0.05 ~ "*", p < 0.10 ~ "\u2020", TRUE ~ "")
+}
+```
+
+# Funciones
+
+```{r funciones}
+bt <- function(v) if (grepl("[^A-Za-z0-9_.]", v)) paste0("`", v, "`") else v
+
+ajustar <- function(d, var, rhs, reml = TRUE) {
+  f <- as.formula(paste0(bt(var), " ~ ", rhs, " + (1 | Bloque)"))
+  suppressMessages(suppressWarnings(
+    tryCatch(
+      lmer(f, data = d, REML = reml,
+           control = lmerControl(check.conv.singular = "ignore")),
+      error = function(e) NULL
+    )
+  ))
+}
+
+# Seleccion N*P vs N+P por LRT (ajuste con ML, obligatorio para efectos fijos)
+seleccionar <- function(d, var, especie) {
+  m_add <- ajustar(d, var, "N + P", reml = FALSE)
+  m_int <- ajustar(d, var, "N * P", reml = FALSE)
+  if (is.null(m_add) || is.null(m_int)) {
+    return(tibble(especie = especie, variable = var, LRT_chisq = NA_real_,
+                  LRT_p = NA_real_, AIC_aditivo = NA_real_, AIC_inter = NA_real_,
+                  BIC_aditivo = NA_real_, BIC_inter = NA_real_,
+                  modelo_sugerido = "ERROR AJUSTE"))
+  }
+  lrt <- anova(m_add, m_int)
+  p   <- lrt$`Pr(>Chisq)`[2]
+  tibble(
+    especie = especie, variable = var,
+    LRT_chisq = round(lrt$Chisq[2], 3), LRT_p = round(p, 4),
+    AIC_aditivo = round(AIC(m_add), 2), AIC_inter = round(AIC(m_int), 2),
+    BIC_aditivo = round(BIC(m_add), 2), BIC_inter = round(BIC(m_int), 2),
+    modelo_sugerido = if (is.na(p)) "revisar" else if (p < 0.05) "N * P" else "N + P"
+  )
+}
+
+# Ajusta el modelo GANADOR con REML = TRUE (estandar para inferencia con lmerTest)
+ajustar_final <- function(d, var, sugerido) {
+  rhs <- if (identical(sugerido, "N * P")) "N * P" else "N + P"
+  ajustar(d, var, rhs, reml = TRUE)
+}
+
+# Tabla ordenada de coeficientes
+# Bondad de ajuste: R2 marginal (solo efectos fijos) y condicional (fijos + bloque)
+bondad <- function(m) {
+  r2 <- tryCatch(performance::r2_nakagawa(m), error = function(e) NULL)
+  tibble(
+    R2m = if (is.null(r2)) NA_real_ else as.numeric(r2$R2_marginal),
+    R2c = if (is.null(r2)) NA_real_ else as.numeric(r2$R2_conditional),
+    AIC = AIC(m), BIC = BIC(m),
+    sd_bloque = as.numeric(attr(lme4::VarCorr(m)$Bloque, "stddev")),
+    singular  = lme4::isSingular(m)
+  )
+}
+
+tidy_modelo <- function(m, especie, variable, sugerido) {
+  if (is.null(m)) return(NULL)
+  gof <- bondad(m)
+  broom.mixed::tidy(m, effects = "fixed", conf.int = TRUE) %>%
+    dplyr::filter(term != "(Intercept)") %>%
+    dplyr::transmute(
+      especie, variable, modelo = sugerido, termino = term,
+      estimado = estimate, se = std.error,
+      IC_inf = conf.low, IC_sup = conf.high,
+      p = p.value, sig = estrellas(p.value),
+      n = nobs(m),
+      R2m = gof$R2m, R2c = gof$R2c, AIC = gof$AIC, BIC = gof$BIC,
+      sd_bloque = gof$sd_bloque, singular = gof$singular
+    )
+}
+
+# Corre seleccion + ajuste final para un grupo completo de variables
+correr_grupo <- function(vars) {
+  sel <- purrr::map_dfr(names(datos_esp), function(esp) {
+    purrr::map_dfr(vars, function(v) seleccionar(datos_esp[[esp]], v, esp))
+  })
+  modelos <- list(); coefs <- list(); k <- 1
+  for (esp in names(datos_esp)) {
+    for (i in seq_along(vars)) {
+      v   <- vars[[i]]
+      eti <- names(vars)[i]
+      sug <- sel$modelo_sugerido[sel$especie == esp & sel$variable == v][1]
+      m   <- ajustar_final(datos_esp[[esp]], v, sug)
+      nm  <- paste(eti, elevacion[[esp]], esp, sep = " | ")
+      modelos[[nm]] <- m
+      coefs[[k]] <- tidy_modelo(m, esp, eti, sug); k <- k + 1
+    }
+  }
+  list(seleccion = sel, modelos = modelos, coeficientes = bind_rows(coefs))
+}
+```
+
+```{r tabla helper}
+tabla <- function(model_list, nombre) {
+  tab <- modelsummary(
+    model_list, output = "data.frame",
+    estimate = "{estimate}{stars} (SE = {std.error}, p = {p.value})",
+    statistic = NULL, stars = TRUE, fmt = 2,
+    gof_map = c("nobs", "r2.marginal", "r2.conditional", "aic", "bic")
+  )
+  tab_t <- as.data.frame(t(tab))
+  colnames(tab_t) <- make.unique(as.character(tab_t[1, ]))
+  tab_t <- tab_t[-1, , drop = FALSE]
+  tab_t$Modelo <- rownames(tab_t); rownames(tab_t) <- NULL
+  tab_t <- tab_t[, c("Modelo", setdiff(names(tab_t), "Modelo")), drop = FALSE]
+  write.xlsx(tab_t, paste0(nombre, ".xlsx"), overwrite = TRUE, asTable = TRUE)
+  message("Guardado: ", nombre, ".xlsx")
+  kbl(tab_t, booktabs = TRUE, align = "l") %>% kable_styling(font_size = 9)
+}
+```
+
+# 1. Variables fisiológicas
+
+```{r fisio}
+res_fisio <- correr_grupo(vars_fisio)
+
+kbl(res_fisio$seleccion, caption = "Selección N*P vs N+P — fisiológicas") %>%
+  kable_styling(font_size = 9)
+
+write.csv(res_fisio$seleccion, "seleccion_modelos_fisio_Bernacchi.csv", row.names = FALSE)
+```
+
+```{r fisio coef}
+res_fisio$coeficientes %>%
+  dplyr::filter(p < 0.05) %>%
+  kbl(digits = 3, caption = "Efectos significativos — fisiológicas") %>%
+  kable_styling(font_size = 9)
+```
+
+```{r fisio tabla}
+tabla(res_fisio$modelos, "modelos_fisiologicos_Bernacchi")
+```
+
+**Comprobación clave.** La corrección de Γ\* se evalúa a nivel de sitio, de modo que dentro
+de cada especie es una constante aditiva. Los coeficientes de N y P deben ser idénticos
+entre `iWUE original` e `iWUE Bernacchi`.
+
+```{r comprobacion invariancia}
+res_fisio$coeficientes %>%
+  dplyr::filter(variable %in% c("iWUE original", "iWUE Bernacchi")) %>%
+  dplyr::select(especie, variable, termino, estimado, p) %>%
+  tidyr::pivot_wider(names_from = variable, values_from = c(estimado, p)) %>%
+  dplyr::mutate(dif_estimado = `estimado_iWUE Bernacchi` - `estimado_iWUE original`,
+                dif_p        = `p_iWUE Bernacchi` - `p_iWUE original`) %>%
+  kbl(digits = 4, caption = "iWUE original vs Bernacchi: los efectos no cambian") %>%
+  kable_styling(font_size = 9)
+```
+
+# 2. Variables morfológicas
+
+```{r morfo}
+res_morfo <- correr_grupo(vars_morfo)
+
+kbl(res_morfo$seleccion, caption = "Selección N*P vs N+P — morfológicas") %>%
+  kable_styling(font_size = 9)
+
+write.csv(res_morfo$seleccion, "seleccion_modelos_morfo_Bernacchi.csv", row.names = FALSE)
+
+res_morfo$coeficientes %>%
+  dplyr::filter(p < 0.05) %>%
+  kbl(digits = 3, caption = "Efectos significativos — morfológicas") %>%
+  kable_styling(font_size = 9)
+```
+
+```{r morfo tabla}
+tabla(res_morfo$modelos, "modelos_morfologicos_Bernacchi")
+```
+
+# 3. Nutrientes foliares
+
+```{r nutri}
+res_nutri <- correr_grupo(vars_nutri)
+
+kbl(res_nutri$seleccion, caption = "Selección N*P vs N+P — nutrientes") %>%
+  kable_styling(font_size = 9)
+
+write.csv(res_nutri$seleccion, "seleccion_modelos_nutrientes_Bernacchi.csv", row.names = FALSE)
+
+res_nutri$coeficientes %>%
+  dplyr::filter(p < 0.05) %>%
+  kbl(digits = 3, caption = "Efectos significativos — nutrientes") %>%
+  kable_styling(font_size = 9)
+```
+
+```{r nutri tabla}
+tabla(res_nutri$modelos, "modelos_nutrientes_Bernacchi")
+```
+
+```{r exportar todo}
+todos <- bind_rows(
+  res_fisio$coeficientes %>% mutate(grupo = "Fisiológicas"),
+  res_morfo$coeficientes %>% mutate(grupo = "Morfológicas"),
+  res_nutri$coeficientes %>% mutate(grupo = "Nutrientes")
+)
+write.xlsx(
+  list(Fisiologicas = res_fisio$coeficientes,
+       Morfologicas = res_morfo$coeficientes,
+       Nutrientes   = res_nutri$coeficientes,
+       Todos        = todos,
+       Seleccion    = bind_rows(res_fisio$seleccion, res_morfo$seleccion, res_nutri$seleccion)),
+  "resultados_modelos_Bernacchi.xlsx", overwrite = TRUE
+)
+```
+
+# 4. Diagnóstico
+
+```{r diagnostico, fig.height=9}
+diagnosticar <- function(modelos, titulo) {
+  par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))
+  for (nm in names(modelos)) {
+    m <- modelos[[nm]]
+    if (is.null(m)) next
+    plot(fitted(m), resid(m), main = paste(nm, "\nResiduales"),
+         xlab = "Ajustados", ylab = "Residuales", cex.main = 0.65, pch = 16, cex = 0.7)
+    abline(h = 0, col = "red")
+    qqnorm(resid(m), main = paste(nm, "\nQQ"), cex.main = 0.65, pch = 16, cex = 0.7)
+    qqline(resid(m), col = "red")
+  }
+  par(mfrow = c(1, 1))
+}
+
+diagnosticar(res_fisio$modelos, "Fisiológicas")
+```
+
+```{r diagnostico morfo nutri, fig.height=9}
+diagnosticar(res_morfo$modelos, "Morfológicas")
+diagnosticar(res_nutri$modelos, "Nutrientes")
+```
+
+# 5. Gráficos
+
+Todas las figuras usan la paleta definida arriba y paneles cuadrados
+(`theme(aspect.ratio = 1)`). La figura de síntesis se exporta a 12 × 15 in y 300 dpi,
+que escalada al 65 % ocupa una página A4 vertical completa con márgenes.
+
+## 5.1 Tabla de bondad de ajuste
+
+```{r gof tabla}
+gof_todos <- bind_rows(
+  res_fisio$coeficientes %>% mutate(grupo = "Fisiológicas"),
+  res_morfo$coeficientes %>% mutate(grupo = "Morfológicas"),
+  res_nutri$coeficientes %>% mutate(grupo = "Nutrientes")
+) %>%
+  dplyr::distinct(grupo, variable, especie, modelo, n, R2m, R2c, AIC, BIC,
+                  sd_bloque, singular)
+
+gof_todos %>%
+  dplyr::filter(grupo == "Fisiológicas") %>%
+  kbl(digits = 3, caption = "Bondad de ajuste — modelos fisiológicos") %>%
+  kable_styling(font_size = 9)
+```
+
+## 5.2 Figura híbrida: medias marginales + observaciones + contrastes
+
+Combina tres capas: las observaciones individuales en pálido, la media marginal estimada
+del modelo seleccionado con su intervalo de confianza, y asteriscos derivados del
+**contraste explícito frente al control**, no del solapamiento de intervalos. Se anota el
+tamaño de celda cuando `n < 3` y se marca con `N×P` el panel cuyo modelo retuvo la
+interacción.
+
+```{r figura hibrida, fig.width=12, fig.height=15}
+vars_main <- c(
+  "iWUE Bernacchi" = "iWUE_Bernacchi (μmol/mol)",
+  "log N masa"     = "logNmass",
+  "N area"         = "N_area",
+  "log P masa"     = "logPmass",
+  "P area"         = "P_area",
+  "N:P foliar"     = "N:P",
+  "SLA"            = "Specific leaf area (cm²/g)"
+)
+
+etiquetas_y <- c("iWUE (µmol mol-1)", "log N masa", "N área (g m-2)",
+                 "log P masa", "P área (g m-2)", "N:P foliar", "SLA (cm2 g-1)")
+
+sel_todas <- bind_rows(res_fisio$seleccion, res_morfo$seleccion, res_nutri$seleccion)
+
+# Contraste de cada tratamiento frente al control, con emmeans
+contrastes_control <- function(m) {
+  emm <- emmeans(m, ~ N * P, at = list(N = c(0, 1), P = c(0, 1)))
+  ct  <- as.data.frame(contrast(emm, method = "trt.vs.ctrl", ref = 1))
+  ct$Treatment <- c("N", "P", "N+P")   # orden de emmeans: (0,0) (1,0) (0,1) (1,1)
+  ct[, c("Treatment", "estimate", "p.value")]
+}
+
+set.seed(7)
+plots <- list(); k <- 1
+
+for (i in seq_along(vars_main)) {
+  v <- vars_main[[i]]
+
+  # limites comunes de la fila, calculados sobre los datos crudos
+  rango <- range(data[[v]], na.rm = TRUE)
+  pad   <- 0.12 * diff(rango)
+
+  for (esp in names(datos_esp)) {
+    d   <- datos_esp[[esp]] %>% dplyr::filter(!is.na(.data[[v]]))
+    sug <- sel_todas$modelo_sugerido[sel_todas$especie == esp & sel_todas$variable == v][1]
+    m   <- ajustar_final(d, v, sug)
+
+    emm_df <- as.data.frame(emmeans(m, ~ N * P, at = list(N = c(0, 1), P = c(0, 1))))
+    emm_df$Treatment <- factor(
+      with(emm_df, ifelse(N == 0 & P == 0, "C",
+                   ifelse(N == 1 & P == 0, "N",
+                   ifelse(N == 0 & P == 1, "P", "N+P")))),
+      levels = c("C", "N", "P", "N+P"))
+
+    ct <- contrastes_control(m)
+    emm_df <- dplyr::left_join(emm_df, ct, by = "Treatment") %>%
+      dplyr::mutate(sig = estrellas(p.value))
+
+    crudos <- d %>%
+      dplyr::transmute(
+        y = .data[[v]],
+        Treatment = factor(ifelse(N == 0 & P == 0, "C",
+                           ifelse(N == 1 & P == 0, "N",
+                           ifelse(N == 0 & P == 1, "P", "N+P"))),
+                           levels = c("C", "N", "P", "N+P")))
+
+    n_celda <- crudos %>% dplyr::count(Treatment, name = "n_obs")
+    emm_df  <- dplyr::left_join(emm_df, n_celda, by = "Treatment")
+
+    control_mean <- emm_df$emmean[emm_df$Treatment == "C"]
+    ylo <- min(rango[1], min(emm_df$lower.CL)) - pad
+    yhi <- max(rango[2], max(emm_df$upper.CL)) + 2.1 * pad
+
+    p <- ggplot(emm_df, aes(x = Treatment, y = emmean)) +
+      geom_jitter(data = crudos, aes(x = Treatment, y = y, colour = Treatment),
+                  width = 0.15, height = 0, size = 0.9, alpha = 0.28,
+                  inherit.aes = FALSE, show.legend = FALSE) +
+      geom_hline(yintercept = control_mean, colour = "grey62",
+                 linetype = "dashed", linewidth = 0.4) +
+      geom_linerange(aes(ymin = lower.CL, ymax = upper.CL), colour = "black",
+                     linewidth = 0.5) +
+      geom_point(aes(fill = Treatment), shape = 21, size = 2.8,
+                 colour = "black", stroke = 0.4) +
+      geom_text(aes(label = sig, y = upper.CL + 0.035 * (yhi - ylo)),
+                vjust = 0, size = 3.4, fontface = "bold", na.rm = TRUE) +
+      geom_text(data = dplyr::filter(emm_df, n_obs < 3),
+                aes(label = paste0("n=", n_obs), y = ylo + 0.025 * (yhi - ylo)),
+                vjust = 0, size = 2.1, colour = "#c0392b", fontface = "bold") +
+      scale_fill_manual(values = sub_colors) +
+      scale_colour_manual(values = raw_colors) +
+      coord_cartesian(ylim = c(ylo, yhi)) +
+      labs(title = if (i == 1) esp else NULL,
+           x = NULL,
+           y = if (esp == names(datos_esp)[1]) etiquetas_y[i] else NULL) +
+      theme_bw(base_size = 9) +
+      theme(aspect.ratio = 1,
+            plot.title = element_text(size = 9, face = "italic", hjust = 0.5),
+            axis.text.x = element_text(size = 7),
+            axis.title.y = element_text(size = 8),
+            panel.grid.minor = element_blank(),
+            legend.position = "none")
+
+    if (identical(sug, "N * P")) {
+      p <- p + annotate("text", x = 4.4, y = yhi, label = "N\u00d7P",
+                        hjust = 1, vjust = 1, size = 2.1,
+                        colour = "grey40", fontface = "italic")
+    }
+    if (esp != names(datos_esp)[1]) p <- p + theme(axis.text.y = element_blank())
+
+    plots[[k]] <- p; k <- k + 1
+  }
+}
+
+fig_hibrida <- wrap_plots(plots, ncol = 6, nrow = length(vars_main)) +
+  plot_annotation(
+    title = "Medias marginales estimadas por tratamiento, con observaciones individuales",
+    subtitle = paste(
+      "Puntos grandes: media marginal del modelo seleccionado (± 95 % IC).",
+      "Puntos pálidos: árboles individuales. Línea discontinua: control.\n",
+      "Asteriscos: contraste frente al control († p<0.1, * p<0.05, ** p<0.01, *** p<0.001).",
+      "N azul · P rojo · N+P gris."),
+    theme = theme(plot.title = element_text(size = 13, hjust = 0.5),
+                  plot.subtitle = element_text(size = 8, hjust = 0.5, colour = "grey30"))
+  )
+
+ggsave("fig_emm_hibrida.png", fig_hibrida, width = 12, height = 15, dpi = 300)
+fig_hibrida
+```
+
+## 5.3 Figura del resultado nulo en iWUE
+
+Los seis contrastes de iWUE en una escala común. Para un resultado nulo esta figura es
+más informativa que los niveles: la anchura de los intervalos muestra la precisión
+alcanzada, no sólo la ausencia de efecto.
+
+```{r figura nula, fig.width=7.5, fig.height=4.6}
+nulo <- res_fisio$coeficientes %>%
+  dplyr::filter(variable == "iWUE Bernacchi", termino %in% c("N", "P")) %>%
+  dplyr::mutate(
+    especie = factor(especie, levels = rev(names(especies))),
+    termino = factor(termino, levels = c("N", "P"),
+                     labels = c("Adición de N", "Adición de P"))
+  )
+
+UMBRAL <- 5   # diferencia minima de interes, en umol mol-1
+
+fig_nulo <- ggplot(nulo, aes(x = estimado, y = especie,
+                             colour = termino, shape = termino)) +
+  annotate("rect", xmin = -UMBRAL, xmax = UMBRAL, ymin = -Inf, ymax = Inf,
+           fill = "grey86", alpha = 0.5) +
+  geom_vline(xintercept = 0, colour = "black", linewidth = 0.5) +
+  geom_errorbarh(aes(xmin = IC_inf, xmax = IC_sup),
+                 height = 0.16, position = position_dodge(width = 0.5),
+                 linewidth = 0.6) +
+  geom_point(size = 2.6, position = position_dodge(width = 0.5)) +
+  scale_colour_manual(values = c("Adición de N" = C_N, "Adición de P" = C_P)) +
+  scale_shape_manual(values = c(16, 15)) +
+  labs(x = "Cambio en iWUE respecto al control (µmol mol-1, ± 95 % IC)",
+       y = NULL, colour = NULL, shape = NULL,
+       title = "Ningún intervalo excluye el cero: la iWUE no responde a 18 años de fertilización",
+       caption = paste0("Banda gris: equivalencia práctica (± ", UMBRAL, " µmol mol-1)")) +
+  theme_bw(base_size = 10) +
+  theme(axis.text.y = element_text(face = "italic"),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "bottom",
+        plot.title = element_text(size = 10))
+
+ggsave("fig_iwue_nulo.png", fig_nulo, width = 7.5, height = 4.6, dpi = 300)
+fig_nulo
+```
+
+## 5.4 Coeficientes por bloque de variables
+
+```{r plot coefs, fig.width=12, fig.height=13}
+plot_coefs_grid <- function(coefs, variables, titulo = "", ratio = 1) {
+  d <- coefs %>%
+    dplyr::filter(variable %in% variables) %>%
+    dplyr::mutate(
+      variable = factor(variable, levels = variables),
+      especie  = factor(especie, levels = names(especies)),
+      termino  = factor(gsub(":", "\u00d7", termino), levels = c("N", "P", "N\u00d7P"))
+    )
+  ggplot(d, aes(x = termino, y = estimado, colour = termino)) +
+    geom_hline(yintercept = 0, linetype = "dashed", colour = "grey62") +
+    geom_linerange(aes(ymin = IC_inf, ymax = IC_sup), linewidth = 0.6) +
+    geom_point(size = 2.2) +
+    geom_text(aes(label = sig, y = IC_sup), vjust = -0.4, size = 3.2,
+              fontface = "bold", colour = "black") +
+    scale_colour_manual(values = c("N" = C_N, "P" = C_P, "N\u00d7P" = C_NP)) +
+    facet_grid(variable ~ especie, scales = "free_y", switch = "y") +
+    labs(title = titulo, x = NULL, y = "Estimado (± 95 % IC)",
+         caption = "N azul · P rojo · N×P gris. † p<0.1, * p<0.05, ** p<0.01, *** p<0.001") +
+    expand_limits(y = 0) +
+    theme_bw(base_size = 9) +
+    theme(aspect.ratio = ratio,
+          legend.position = "none",
+          strip.text.y.left = element_text(angle = 0, size = 8),
+          strip.text.x = element_text(face = "italic", size = 8),
+          strip.placement = "outside",
+          panel.grid.minor = element_blank())
+}
+
+g_fisio <- plot_coefs_grid(
+  res_fisio$coeficientes,
+  c("iWUE original", "iWUE Bernacchi", "d13C celulosa", "Ci/Ca Bernacchi", "d18O"),
+  "Variables fisiológicas")
+
+g_morfo <- plot_coefs_grid(
+  res_morfo$coeficientes,
+  c("SLA", "Grosor", "Dureza", "Area foliar", "DMC"),
+  "Variables morfológicas")
+
+g_nutri <- plot_coefs_grid(
+  res_nutri$coeficientes,
+  c("log N masa", "N area", "log P masa", "P area", "N:P foliar", "C:N foliar"),
+  "Nutrientes foliares")
+
+ggsave("coef_fisiologicas_Bernacchi.png", g_fisio, width = 12, height = 11, dpi = 300)
+ggsave("coef_morfologicas_Bernacchi.png", g_morfo, width = 12, height = 11, dpi = 300)
+ggsave("coef_nutrientes_Bernacchi.png",   g_nutri, width = 12, height = 13, dpi = 300)
+
+g_fisio
+```
+
+## 5.5 iWUE: original frente a Bernacchi
+
+```{r comparacion iwue, fig.width=10, fig.height=4.6}
+comp <- data %>%
+  dplyr::select(species_label, elevation_m,
+                orig = `iWUE (μmol/mol)`, bern = `iWUE_Bernacchi (μmol/mol)`)
+
+p1 <- ggplot(comp, aes(orig, bern, colour = factor(elevation_m))) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point(size = 1.5, alpha = 0.8) +
+  scale_colour_manual(values = c("1000" = C_P, "2000" = C_N, "3000" = "#4a8f5b")) +
+  coord_equal(xlim = c(0, 120), ylim = c(0, 120)) +
+  labs(x = "iWUE original (Γ* = 40 ppm)", y = "iWUE Bernacchi (Γ*(T))",
+       colour = "Elevación (m)", title = "Correspondencia entre versiones") +
+  theme_bw(base_size = 10) + theme(aspect.ratio = 1)
+
+p2 <- res_fisio$coeficientes %>%
+  dplyr::filter(variable %in% c("iWUE original", "iWUE Bernacchi"), termino == "N") %>%
+  dplyr::mutate(especie = factor(especie, levels = names(especies))) %>%
+  ggplot(aes(x = especie, y = estimado, fill = variable)) +
+  geom_hline(yintercept = 0) +
+  geom_col(position = position_dodge(0.8), width = 0.7,
+           colour = "black", linewidth = 0.2) +
+  geom_errorbar(aes(ymin = IC_inf, ymax = IC_sup),
+                position = position_dodge(0.8), width = 0.2) +
+  scale_fill_manual(values = c("iWUE original" = "#b8b8b8", "iWUE Bernacchi" = C_N)) +
+  labs(x = NULL, y = "Efecto de N (± 95 % IC)", fill = NULL,
+       title = "Los coeficientes no cambian") +
+  theme_bw(base_size = 10) +
+  theme(aspect.ratio = 1, legend.position = "bottom",
+        axis.text.x = element_text(angle = 40, hjust = 1, face = "italic", size = 7))
+
+ggsave("comparacion_iWUE_Bernacchi.png", p1 + p2, width = 10, height = 4.6, dpi = 300)
+p1 + p2
+```
+
+# 6. Tests adicionales: iWUE frente a N_area
+
+```{r tests narea}
+tests_narea <- purrr::map_dfr(names(datos_esp), function(esp) {
+  d <- datos_esp[[esp]]
+  m <- suppressWarnings(lmer(
+    `iWUE_Bernacchi (μmol/mol)` ~ N_area + N * P + (1 | Bloque),
+    data = d, control = lmerControl(check.conv.singular = "ignore")))
+  broom.mixed::tidy(m, effects = "fixed") %>%
+    dplyr::filter(term == "N_area") %>%
+    dplyr::transmute(especie = esp, estimado = estimate, se = std.error, p = p.value)
+})
+kbl(tests_narea, digits = 4,
+    caption = "Efecto de N por área sobre iWUE (controlando por tratamiento)") %>%
+  kable_styling(font_size = 9)
+```
+
+```{r session}
+sessionInfo()
+```

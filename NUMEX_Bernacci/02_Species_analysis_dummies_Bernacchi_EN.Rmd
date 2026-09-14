@@ -1,0 +1,829 @@
+---
+title: "Species analysis — dummy-coded models (Bernacchi dataset)"
+author: "Andrea Chávez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 11, fig.height = 7)
+```
+
+# Notes on this version
+
+English translation of `02_Species-analysis-dummies_Bernacchi.Rmd`, prepared for the
+manuscript. Everything is in English now: prose, chunk labels, comments, object and
+function names, plot labels, captions, and exported file names.
+
+**Scope changes requested for this version**
+
+- **Oxygen results removed.** δ18O is no longer part of the physiological variable set
+  and does not appear in any table or figure.
+- **Physiological group = Bernacchi iWUE + δ13C_cellulose.** The original iWUE
+  (Γ\* = 40 ppm, fixed) and both versions of Ci/Ca are dropped, so the
+  original-vs-Bernacchi comparison section (and the invariance check confirming that
+  N/P coefficients are identical between the two iWUE versions) was removed — there is
+  nothing left to compare against. δ13C_cellulose (the `` `δ13C (‰ v.s.V-PDB)` ``
+  column) was added back into `vars_physio` so it is fitted, tabulated and plotted
+  alongside iWUE — see the `variable-groups` chunk.
+- **Units added throughout the graphical results.** Every variable label used in a plot,
+  facet strip, or table now carries its unit, defined once in the variable-group vectors
+  below and reused everywhere (axis labels, facet labels, filters) instead of being
+  retyped — see the "unit assumptions" note in the variable-groups chunk.
+- **Results tables also exported to Word.** In addition to the existing Excel/HTML
+  output, Section 7 builds a `.docx` file (via `officer`/`flextable`) with the
+  significant-effects tables in English: a main table for iWUE and supplementary tables
+  for the morphological and nutrient traits, plus the model-selection summary.
+- `Bloque` (the original Spanish column name in the source spreadsheet) is aliased to
+  `Block` for use in the English script; the raw data column itself is untouched.
+
+**Bug fixes carried over from the original script** (all still apply here)
+
+1. Two chunks were both named `{r aditivo}`. Knitr aborts on duplicate chunk names.
+2. In the variable vector, one `iWUE` label used the MICRO SIGN (U+00B5) while the actual
+   data column used the GREEK SMALL LETTER MU (U+03BC), so model selection silently
+   failed for iWUE. Fixed here by never retyping a variable-label string for comparison —
+   subsets are always derived by indexing `names(vars_*)`, not by retyping the label.
+3. The interaction chunks called `summary(mod_logNmass_pt)` and `summary(mod_SLA_pt)`
+   before those objects existed (they were defined in later additive chunks).
+4. In the nitrogen-models figure, six `"Parea | ..."` entries pointed at `mod_Narea_*`.
+5. `theme(base_size = 14, ...)` in the final plotting block: `theme()` does not accept
+   `base_size`.
+6. In the same block, `panel.grid.major = element_line(...)` sat outside `theme()` due to
+   a misplaced closing parenthesis and had no effect.
+7. `geom_linerange()` does not accept a `width` argument.
+8. `plot_coefs()` relies on `broom.mixed::tidy()`, but `broom.mixed` was not loaded.
+9. `data` was filtered with `dplyr::select()` without including `Bloque` as a factor or
+   the derived log-transformed columns.
+
+**Structure**
+
+The ~200-line copy-and-paste blocks are replaced by loops over species × variable.
+Results are identical to writing them out by hand, and adding a new variable is a
+one-line change to a variable-group vector.
+
+---
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(broom.mixed)
+library(emmeans)
+library(ggplot2)
+library(patchwork)
+library(openxlsx)
+library(knitr)
+library(kableExtra)
+library(flextable)
+library(officer)      # Word (.docx) export, Section 7
+library(performance)   # marginal and conditional R2 (Nakagawa & Schielzeth)
+```
+
+```{r data}
+data <- read_excel("data_for_R_Bernacchi.xlsx", sheet = "data")
+
+data <- data %>%
+  mutate(
+    logNmass = log(LNC),
+    logPmass = log(LPC),
+    logCmass = log(LCC),
+    Block    = factor(Bloque)   # English alias for the original "Bloque" column
+  )
+
+# Sanity check: no leading/trailing whitespace in text identifiers
+stopifnot(all(data$species_label == trimws(data$species_label)))
+table(data$species_label, data$Sub)
+```
+
+```{r species}
+species_list <- list(
+  "P. torta"        = "Pouteria torta",
+  "C. racemosa"     = "Clarisia racemosa",
+  "A. lojaensis"    = "Alchornea lojaensis",
+  "Myrcia sp. nov." = "Myrcia sp nov",
+  "H. purpurascens" = "Hedyosmum purpurascens",
+  "W. loxensis"     = "Weinmannia loxensis"
+)
+
+elevation <- c("P. torta" = 1000, "C. racemosa" = 1000,
+               "A. lojaensis" = 2000, "Myrcia sp. nov." = 2000,
+               "H. purpurascens" = 3000, "W. loxensis" = 3000)
+
+species_data <- lapply(species_list, function(sp) dplyr::filter(data, species_label == sp))
+sapply(species_data, nrow)
+```
+
+```{r variable-groups}
+# Unit assumptions (please confirm against the data dictionary and correct if needed):
+#   - LNC, LPC, LCC are mass-based leaf nutrient contents, reported as % dry mass.
+#   - N_area, P_area, C_area follow the existing "g m-2" convention already used
+#     elsewhere in the original script.
+#   - N:P and C:N are unitless mass-based ratios.
+# Confirmed against the real data: LNC * LMA / 1000 = N_area (g m-2) to within
+# rounding for every row checked, so LNC/LPC/LCC are mass-based nutrient content
+# in mg g-1 dry mass (not a percentage) — units below reflect that.
+# The unit is embedded once in each label (the vector *name*) and reused everywhere
+# downstream (axis labels, facet strips, table rows) instead of being retyped.
+
+# IMPORTANT: keep "iWUE, Bernacchi" as the FIRST element of this vector.
+# Section 5.3 (the null-result figure) picks it out with names(vars_physio)[1],
+# so the order here decides which variable that figure describes.
+vars_physio <- c(
+  "iWUE, Bernacchi (µmol mol-1)"          = "iWUE_Bernacchi (μmol/mol)",
+  "d13C cellulose (per mil vs V-PDB)"     = "δ13C (‰ v.s.V-PDB)"
+)
+
+vars_morpho <- c(
+  "SLA (cm² g-1)"          = "Specific leaf area (cm²/g)",
+  "Thickness (mm)"           = "thickness (mm)",
+  "Punch force (kN m-1)"    = "force to punch (kN/m)",
+  "Leaf area (cm²)"          = "LA",
+  "DMC (mg g-1)"             = "dry matter content (mg/g)"
+)
+
+vars_nutrients <- c(
+  "N content, mass-based (mg g-1 DM)"   = "LNC",
+  "ln N content (mg g-1 DM)"            = "logNmass",
+  "N content, area-based (g m-2)"       = "N_area",
+  "P content, mass-based (mg g-1 DM)"   = "LPC",
+  "ln P content (mg g-1 DM)"            = "logPmass",
+  "P content, area-based (g m-2)"       = "P_area",
+  "C content, mass-based (mg g-1 DM)"   = "LCC",
+  "ln C content (mg g-1 DM)"            = "logCmass",
+  "C content, area-based (g m-2)"       = "C_area",
+  "Leaf N:P ratio (mass-based)"         = "N:P",
+  "Leaf C:N ratio (mass-based)"         = "C:N"
+)
+```
+
+# Project palette
+
+`N` in blue, `P` in red, `N+P` in grey. Defined once and reused in every figure, so
+changing the scheme here propagates through the whole document.
+
+```{r palette}
+C_N  <- "#2c6fbb"   # blue
+C_P  <- "#c0392b"   # red
+C_NP <- "#7f7f7f"   # grey
+C_C  <- "#ffffff"   # control, white fill
+
+sub_colors  <- c("C" = C_C, "N" = C_N, "P" = C_P, "N+P" = C_NP)
+raw_colors  <- c("C" = "#9a9a9a", "N" = C_N, "P" = C_P, "N+P" = "#6f6f6f")
+term_colors <- c("N" = C_N, "P" = C_P, "N:P" = C_NP, "N×P" = C_NP)
+
+sig_stars <- function(p) {
+  dplyr::case_when(is.na(p) ~ "", p < 0.001 ~ "***", p < 0.01 ~ "**",
+                   p < 0.05 ~ "*", p < 0.10 ~ "†", TRUE ~ "")
+}
+```
+
+# Functions
+
+```{r functions}
+# All six functions below are written once here and then reused for every
+# species x variable combination (through run_group(), further down). This is
+# the "function instead of copy-paste" idea: if you ever need to change how a
+# model is fitted, you change it in ONE place and every result updates.
+
+# A data column name like "N_area" can go straight into an R formula, but one
+# like "iWUE_Bernacchi (μmol/mol)" has spaces/parentheses and needs backticks
+# (`iWUE_Bernacchi (μmol/mol)`) to be valid R syntax. This helper adds the
+# backticks only when the name actually needs them.
+backtick_if_needed <- function(v) if (grepl("[^A-Za-z0-9_.]", v)) paste0("`", v, "`") else v
+
+# Fits one mixed model: response `var`, fixed-effect formula `rhs` (e.g. "N + P"
+# or "N * P"), and a random intercept per Block — (1 | Block) lets each
+# experimental block have its own baseline, which soaks up block-to-block soil/
+# microclimate differences instead of leaking them into the N/P estimates.
+# reml = FALSE is required while COMPARING fixed-effect structures (select_model,
+# just below); reml = TRUE is the correct setting once a structure is fixed and
+# you want to report/interpret it (fit_final_model). Wrapped in tryCatch so that
+# one species/variable combination failing to converge returns NULL instead of
+# stopping the whole run_group() loop.
+fit_model <- function(d, var, rhs, reml = TRUE) {
+  f <- as.formula(paste0(backtick_if_needed(var), " ~ ", rhs, " + (1 | Block)"))
+  suppressMessages(suppressWarnings(
+    tryCatch(
+      lmer(f, data = d, REML = reml,
+           control = lmerControl(check.conv.singular = "ignore")),
+      error = function(e) NULL
+    )
+  ))
+}
+
+# Decides, for one species and one variable, whether the N x P interaction is
+# worth keeping. It fits both the additive model (N + P) and the interaction
+# model (N * P), then compares them with a likelihood-ratio test (LRT): anova()
+# on two nested lmer models returns a chi-squared test of whether the extra
+# interaction term significantly improves the fit. p < 0.05 -> keep "N * P";
+# otherwise the simpler "N + P" is preferred (fewer parameters, easier to read).
+select_model <- function(d, var, species) {
+  m_add <- fit_model(d, var, "N + P", reml = FALSE)
+  m_int <- fit_model(d, var, "N * P", reml = FALSE)
+  if (is.null(m_add) || is.null(m_int)) {
+    return(tibble(species = species, variable = var, LRT_chisq = NA_real_,
+                  LRT_p = NA_real_, AIC_additive = NA_real_, AIC_interaction = NA_real_,
+                  BIC_additive = NA_real_, BIC_interaction = NA_real_,
+                  selected_model = "FIT ERROR"))
+  }
+  lrt <- anova(m_add, m_int)
+  p   <- lrt$`Pr(>Chisq)`[2]   # row 2 of anova() output = the comparison test
+  tibble(
+    species = species, variable = var,
+    LRT_chisq = round(lrt$Chisq[2], 3), LRT_p = round(p, 4),
+    AIC_additive = round(AIC(m_add), 2), AIC_interaction = round(AIC(m_int), 2),
+    BIC_additive = round(BIC(m_add), 2), BIC_interaction = round(BIC(m_int), 2),
+    selected_model = if (is.na(p)) "review" else if (p < 0.05) "N * P" else "N + P"
+  )
+}
+
+# Re-fits whichever formula select_model() chose, this time with REML = TRUE.
+# This is the model whose coefficients actually get reported/plotted.
+fit_final_model <- function(d, var, selected) {
+  rhs <- if (identical(selected, "N * P")) "N * P" else "N + P"
+  fit_model(d, var, rhs, reml = TRUE)
+}
+
+# One-row summary of how well a model fits, pulled from the `performance`
+# package: R2m ("marginal" R2) is the variance explained by N/P alone; R2c
+# ("conditional" R2) adds the variance explained by the Block random effect on
+# top. `singular` flags a model where the block-to-block variance was
+# estimated at essentially zero — not wrong, but a sign there may be too few
+# blocks/observations for that random effect to be estimated reliably.
+goodness_of_fit <- function(m) {
+  r2 <- tryCatch(performance::r2_nakagawa(m), error = function(e) NULL)
+  tibble(
+    R2m = if (is.null(r2)) NA_real_ else as.numeric(r2$R2_marginal),
+    R2c = if (is.null(r2)) NA_real_ else as.numeric(r2$R2_conditional),
+    AIC = AIC(m), BIC = BIC(m),
+    sd_block = as.numeric(attr(lme4::VarCorr(m)$Block, "stddev")),
+    singular = lme4::isSingular(m)
+  )
+}
+
+# Turns one fitted model into a tidy (one-row-per-coefficient) data frame:
+# estimate, standard error, 95% CI, p-value and significance stars, plus the
+# goodness-of-fit numbers from above attached to every row for convenience.
+# The intercept is dropped because for a dummy-coded N/P design it represents
+# the control group's mean, not a treatment effect, and would clutter every
+# results table.
+tidy_model <- function(m, species, variable, selected) {
+  if (is.null(m)) return(NULL)
+  gof <- goodness_of_fit(m)
+  broom.mixed::tidy(m, effects = "fixed", conf.int = TRUE) %>%
+    dplyr::filter(term != "(Intercept)") %>%
+    dplyr::transmute(
+      species, variable, model = selected, term = term,
+      estimate = estimate, se = std.error,
+      ci_low = conf.low, ci_high = conf.high,
+      p = p.value, sig = sig_stars(p.value),
+      n = nobs(m),
+      R2m = gof$R2m, R2c = gof$R2c, AIC = gof$AIC, BIC = gof$BIC,
+      sd_block = gof$sd_block, singular = gof$singular
+    )
+}
+
+# The "engine" that turns a variable-group vector (e.g. vars_physio) into full
+# results. For every species x variable combination it: (1) runs select_model()
+# to choose N+P vs N*P, (2) fits that winning model, and (3) tidies its
+# coefficients. This nested-loop pattern is what replaces the ~200 lines of
+# copy-pasted model code from the original script — adding a new variable to
+# analyse is just adding one line to a vars_* vector, not writing a new block.
+#
+# `models` is a *named list* of fitted lme4 objects (one per species x
+# variable) — keeping the actual model objects, not just their coefficients,
+# is what lets Sections 4 (diagnostics) and 5.4 (make_table) inspect them
+# later without re-fitting anything.
+run_group <- function(vars) {
+  # purrr::map_dfr() is like lapply(), but it row-binds the results into one
+  # data frame automatically instead of returning a list you'd have to
+  # combine yourself. The inner map_dfr() loops over variables for one
+  # species; the outer one loops over species, so together they cover every
+  # species x variable combination.
+  sel <- purrr::map_dfr(names(species_data), function(sp) {
+    purrr::map_dfr(vars, function(v) select_model(species_data[[sp]], v, sp))
+  })
+
+  models <- list(); coefs <- list(); k <- 1
+  for (sp in names(species_data)) {
+    for (i in seq_along(vars)) {
+      v      <- vars[[i]]           # the real data-column name, e.g. "N_area"
+      label  <- names(vars)[i]      # the human-readable label with units
+      # Look up, in the selection table built above, which formula won for
+      # this exact species/variable pair. The trailing [1] just guards
+      # against duplicate rows ever sneaking in — there should only be one.
+      chosen <- sel$selected_model[sel$species == sp & sel$variable == v][1]
+      m      <- fit_final_model(species_data[[sp]], v, chosen)
+      nm     <- paste(label, elevation[[sp]], sp, sep = " | ")
+      models[[nm]] <- m
+      coefs[[k]] <- tidy_model(m, sp, label, chosen); k <- k + 1
+    }
+  }
+  list(selection = sel, models = models, coefficients = bind_rows(coefs))
+}
+```
+
+```{r table-helper}
+# Wide model-comparison table (one column per model), built directly from
+# broom.mixed + performance, so this does not depend on the modelsummary
+# package (not installable in every R setup without full CRAN access).
+make_table <- function(model_list, name) {
+  rows <- purrr::map_dfr(names(model_list), function(nm) {
+    m <- model_list[[nm]]
+    if (is.null(m)) return(NULL)
+    tt  <- broom.mixed::tidy(m, effects = "fixed")
+    gof <- goodness_of_fit(m)
+    coef_rows <- tibble(
+      Model = nm,
+      Term  = tt$term,
+      Value = sprintf("%.2f%s (SE = %.2f, p = %.3f)",
+                       tt$estimate, sig_stars(tt$p.value), tt$std.error, tt$p.value)
+    )
+    gof_rows <- tibble(
+      Model = nm,
+      Term  = c("n (obs.)", "R2 marginal", "R2 conditional", "AIC", "BIC"),
+      Value = c(as.character(nobs(m)),
+                sprintf("%.2f", gof$R2m), sprintf("%.2f", gof$R2c),
+                sprintf("%.1f", gof$AIC), sprintf("%.1f", gof$BIC))
+    )
+    bind_rows(coef_rows, gof_rows)
+  })
+
+  tab_t <- rows %>% tidyr::pivot_wider(names_from = Model, values_from = Value)
+
+  write.xlsx(tab_t, paste0(name, ".xlsx"), overwrite = TRUE, asTable = TRUE)
+  message("Saved: ", name, ".xlsx")
+  kbl(tab_t, booktabs = TRUE, align = "l") %>% kable_styling(font_size = 9)
+}
+```
+
+# 1. Physiological variables
+
+```{r physio}
+res_physio <- run_group(vars_physio)
+
+kbl(res_physio$selection, caption = "Model selection, N*P vs N+P — physiological variables") %>%
+  kable_styling(font_size = 9)
+
+write.csv(res_physio$selection, "model_selection_physio_Bernacchi_EN.csv", row.names = FALSE)
+```
+
+```{r physio-coef}
+res_physio$coefficients %>%
+  dplyr::filter(p < 0.05) %>%
+  kbl(digits = 3, caption = "Significant effects — physiological variables") %>%
+  kable_styling(font_size = 9)
+```
+
+```{r physio-table}
+make_table(res_physio$models, "models_physiological_Bernacchi_EN")
+```
+
+# 2. Morphological variables
+
+```{r morpho}
+res_morpho <- run_group(vars_morpho)
+
+kbl(res_morpho$selection, caption = "Model selection, N*P vs N+P — morphological variables") %>%
+  kable_styling(font_size = 9)
+
+write.csv(res_morpho$selection, "model_selection_morpho_Bernacchi_EN.csv", row.names = FALSE)
+
+res_morpho$coefficients %>%
+  dplyr::filter(p < 0.05) %>%
+  kbl(digits = 3, caption = "Significant effects — morphological variables") %>%
+  kable_styling(font_size = 9)
+```
+
+```{r morpho-table}
+make_table(res_morpho$models, "models_morphological_Bernacchi_EN")
+```
+
+# 3. Leaf nutrients
+
+```{r nutrients}
+res_nutrients <- run_group(vars_nutrients)
+
+kbl(res_nutrients$selection, caption = "Model selection, N*P vs N+P — nutrient variables") %>%
+  kable_styling(font_size = 9)
+
+write.csv(res_nutrients$selection, "model_selection_nutrients_Bernacchi_EN.csv", row.names = FALSE)
+
+res_nutrients$coefficients %>%
+  dplyr::filter(p < 0.05) %>%
+  kbl(digits = 3, caption = "Significant effects — nutrient variables") %>%
+  kable_styling(font_size = 9)
+```
+
+```{r nutrients-table}
+make_table(res_nutrients$models, "models_nutrients_Bernacchi_EN")
+```
+
+```{r export-all}
+all_coefs <- bind_rows(
+  res_physio$coefficients    %>% mutate(group = "Physiological"),
+  res_morpho$coefficients    %>% mutate(group = "Morphological"),
+  res_nutrients$coefficients %>% mutate(group = "Nutrients")
+)
+write.xlsx(
+  list(Physiological = res_physio$coefficients,
+       Morphological = res_morpho$coefficients,
+       Nutrients     = res_nutrients$coefficients,
+       All           = all_coefs,
+       Selection     = bind_rows(res_physio$selection, res_morpho$selection, res_nutrients$selection)),
+  "results_models_Bernacchi_EN.xlsx", overwrite = TRUE
+)
+```
+
+# 4. Diagnostics
+
+```{r diagnostics, fig.height=9}
+plot_diagnostics <- function(models, title) {
+  par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))
+  for (nm in names(models)) {
+    m <- models[[nm]]
+    if (is.null(m)) next
+    plot(fitted(m), resid(m), main = paste(nm, "\nResiduals"),
+         xlab = "Fitted", ylab = "Residuals", cex.main = 0.65, pch = 16, cex = 0.7)
+    abline(h = 0, col = "red")
+    qqnorm(resid(m), main = paste(nm, "\nQQ"), cex.main = 0.65, pch = 16, cex = 0.7)
+    qqline(resid(m), col = "red")
+  }
+  par(mfrow = c(1, 1))
+}
+
+plot_diagnostics(res_physio$models, "Physiological")
+```
+
+```{r diagnostics-morpho-nutrients, fig.height=9}
+plot_diagnostics(res_morpho$models, "Morphological")
+plot_diagnostics(res_nutrients$models, "Nutrients")
+```
+
+# 5. Figures
+
+All figures use the palette defined above and square panels (`theme(aspect.ratio = 1)`).
+The summary figure is exported at 12 x 15 in and 300 dpi, which at 65% scaling fills a
+full A4 portrait page with margins.
+
+## 5.1 Goodness-of-fit table
+
+```{r gof-table}
+gof_all <- bind_rows(
+  res_physio$coefficients    %>% mutate(group = "Physiological"),
+  res_morpho$coefficients    %>% mutate(group = "Morphological"),
+  res_nutrients$coefficients %>% mutate(group = "Nutrients")
+) %>%
+  dplyr::distinct(group, variable, species, model, n, R2m, R2c, AIC, BIC,
+                  sd_block, singular)
+
+gof_all %>%
+  dplyr::filter(group == "Physiological") %>%
+  kbl(digits = 3, caption = "Goodness of fit — physiological models") %>%
+  kable_styling(font_size = 9)
+```
+
+## 5.2 Hybrid figure: marginal means + observations + contrasts
+
+Combines three layers: individual observations in pale colour, the estimated marginal
+mean of the selected model with its confidence interval, and asterisks derived from an
+**explicit contrast against the control**, not from interval overlap. Cell size is
+annotated when `n < 3`, and panels whose selected model retained the interaction are
+flagged `N×P`.
+
+```{r control-contrasts-function}
+# emmeans() computes the model's PREDICTED mean for each of the four
+# treatment cells (Control, N, P, N+P) — this is different from the raw
+# per-cell average, because it comes from the fitted model and already
+# accounts for the Block random effect. `at = list(N = c(0,1), P = c(0,1))`
+# tells it exactly which four combinations to predict, and the row order it
+# returns is always (0,0), (1,0), (0,1), (1,1) — i.e. C, N, P, N+P — which is
+# why the hardcoded label vector below lines up correctly.
+#
+# contrast(..., method = "trt.vs.ctrl", ref = 1) then subtracts the control
+# (ref = 1, the first row) from every other cell, giving "how much did N (or
+# P, or N+P) change the outcome relative to control", with its own p-value —
+# this is the number that actually answers the experimental question, as
+# opposed to just comparing raw confidence intervals for overlap.
+control_contrasts <- function(m) {
+  emm <- emmeans(m, ~ N * P, at = list(N = c(0, 1), P = c(0, 1)))
+  ct  <- as.data.frame(contrast(emm, method = "trt.vs.ctrl", ref = 1))
+  ct$Treatment <- c("N", "P", "N+P")   # emmeans order: (0,0) (1,0) (0,1) (1,1)
+  ct[, c("Treatment", "estimate", "p.value")]
+}
+```
+
+```{r hybrid-figure, fig.width=12, fig.height=15}
+vars_main <- c(
+  "iWUE, Bernacchi (µmol mol-1)"      = "iWUE_Bernacchi (μmol/mol)",
+  "ln N content (mg g-1 DM)"          = "logNmass",
+  "N content, area-based (g m-2)"     = "N_area",
+  "ln P content (mg g-1 DM)"          = "logPmass",
+  "P content, area-based (g m-2)"     = "P_area",
+  "Leaf N:P ratio (mass-based)"       = "N:P",
+  "SLA (cm² g-1)"                     = "Specific leaf area (cm²/g)"
+)
+
+selection_all <- bind_rows(res_physio$selection, res_morpho$selection, res_nutrients$selection)
+
+set.seed(7)      # geom_jitter() below adds random horizontal scatter to points;
+                  # fixing the seed just makes the figure reproducible run-to-run.
+plots <- list(); k <- 1
+
+# Two nested loops build one small ggplot panel per (variable, species) pair,
+# stored in `plots`, and patchwork::wrap_plots() (below the loop) arranges all
+# of them into one big grid at the end. This is the same "build many small
+# things in a loop, then assemble them" pattern as run_group() above — it's
+# what lets one block of code produce a 7 x 6 grid of panels instead of 42
+# copy-pasted ggplot calls.
+for (i in seq_along(vars_main)) {
+  v       <- vars_main[[i]]          # real data-column name for this row
+  y_label <- names(vars_main)[i]     # its label (with units), used as the y-axis title
+
+  # Common y-axis limits for the whole row (all 6 species), computed once from
+  # the raw data, so that panels in the same row are visually comparable —
+  # without this, ggplot would auto-scale each species panel separately.
+  rng <- range(data[[v]], na.rm = TRUE)
+  pad <- 0.12 * diff(rng)
+
+  for (sp in names(species_data)) {
+    # .data[[v]] is "tidy evaluation": normally you'd write dplyr::filter(!is.na(SLA))
+    # with the column name typed literally, but here `v` is a variable holding
+    # the column name as a string, decided by the loop — .data[[v]] tells dplyr
+    # "use whatever column name is stored in v".
+    d      <- species_data[[sp]] %>% dplyr::filter(!is.na(.data[[v]]))
+    chosen <- selection_all$selected_model[selection_all$species == sp & selection_all$variable == v][1]
+    m      <- fit_final_model(d, v, chosen)
+
+    emm_df <- as.data.frame(emmeans(m, ~ N * P, at = list(N = c(0, 1), P = c(0, 1))))
+    emm_df$Treatment <- factor(
+      with(emm_df, ifelse(N == 0 & P == 0, "C",
+                   ifelse(N == 1 & P == 0, "N",
+                   ifelse(N == 0 & P == 1, "P", "N+P")))),
+      levels = c("C", "N", "P", "N+P"))
+
+    ct <- control_contrasts(m)
+    emm_df <- dplyr::left_join(emm_df, ct, by = "Treatment") %>%
+      dplyr::mutate(sig = sig_stars(p.value))
+
+    raw <- d %>%
+      dplyr::transmute(
+        y = .data[[v]],
+        Treatment = factor(ifelse(N == 0 & P == 0, "C",
+                           ifelse(N == 1 & P == 0, "N",
+                           ifelse(N == 0 & P == 1, "P", "N+P"))),
+                           levels = c("C", "N", "P", "N+P")))
+
+    n_cell <- raw %>% dplyr::count(Treatment, name = "n_obs")
+    emm_df <- dplyr::left_join(emm_df, n_cell, by = "Treatment")
+
+    control_mean <- emm_df$emmean[emm_df$Treatment == "C"]
+    ylo <- min(rng[1], min(emm_df$lower.CL)) - pad
+    yhi <- max(rng[2], max(emm_df$upper.CL)) + 2.1 * pad
+
+    p <- ggplot(emm_df, aes(x = Treatment, y = emmean)) +
+      geom_jitter(data = raw, aes(x = Treatment, y = y, colour = Treatment),
+                  width = 0.15, height = 0, size = 0.9, alpha = 0.28,
+                  inherit.aes = FALSE, show.legend = FALSE) +
+      geom_hline(yintercept = control_mean, colour = "grey62",
+                 linetype = "dashed", linewidth = 0.4) +
+      geom_linerange(aes(ymin = lower.CL, ymax = upper.CL), colour = "black",
+                     linewidth = 0.5) +
+      geom_point(aes(fill = Treatment), shape = 21, size = 2.8,
+                 colour = "black", stroke = 0.4) +
+      geom_text(aes(label = sig, y = upper.CL + 0.035 * (yhi - ylo)),
+                vjust = 0, size = 3.4, fontface = "bold", na.rm = TRUE) +
+      geom_text(data = dplyr::filter(emm_df, n_obs < 3),
+                aes(label = paste0("n=", n_obs), y = ylo + 0.025 * (yhi - ylo)),
+                vjust = 0, size = 2.1, colour = "#c0392b", fontface = "bold") +
+      scale_fill_manual(values = sub_colors) +
+      scale_colour_manual(values = raw_colors) +
+      coord_cartesian(ylim = c(ylo, yhi)) +
+      labs(title = if (i == 1) sp else NULL,
+           x = NULL,
+           y = if (sp == names(species_data)[1]) y_label else NULL) +
+      theme_bw(base_size = 9) +
+      theme(aspect.ratio = 1,
+            plot.title = element_text(size = 9, face = "italic", hjust = 0.5),
+            axis.text.x = element_text(size = 7),
+            axis.title.y = element_text(size = 8),
+            panel.grid.minor = element_blank(),
+            legend.position = "none")
+
+    if (identical(chosen, "N * P")) {
+      p <- p + annotate("text", x = 4.4, y = yhi, label = "N×P",
+                        hjust = 1, vjust = 1, size = 2.1,
+                        colour = "grey40", fontface = "italic")
+    }
+    if (sp != names(species_data)[1]) p <- p + theme(axis.text.y = element_blank())
+
+    plots[[k]] <- p; k <- k + 1
+  }
+}
+
+fig_hybrid <- wrap_plots(plots, ncol = 6, nrow = length(vars_main)) +
+  plot_annotation(
+    title = "Estimated marginal means by treatment, with individual observations",
+    subtitle = paste(
+      "Large points: marginal mean of the selected model (± 95% CI).",
+      "Pale points: individual trees. Dashed line: control.\n",
+      "Asterisks: contrast vs. control († p<0.1, * p<0.05, ** p<0.01, *** p<0.001).",
+      "N blue - P red - N+P grey."),
+    theme = theme(plot.title = element_text(size = 13, hjust = 0.5),
+                  plot.subtitle = element_text(size = 8, hjust = 0.5, colour = "grey30"))
+  )
+
+ggsave("fig_emm_hybrid_EN.png", fig_hybrid, width = 12, height = 15, dpi = 300)
+fig_hybrid
+```
+
+## 5.3 Null-result figure for iWUE
+
+The two contrasts for iWUE on a common scale. For a null result, this figure is more
+informative than the raw levels: interval width shows the precision achieved, not just
+the absence of an effect.
+
+```{r null-figure, fig.width=7.5, fig.height=4.6}
+null_result <- res_physio$coefficients %>%
+  dplyr::filter(variable == names(vars_physio)[1], term %in% c("N", "P")) %>%
+  dplyr::mutate(
+    species = factor(species, levels = rev(names(species_list))),
+    term    = factor(term, levels = c("N", "P"), labels = c("N addition", "P addition"))
+  )
+
+THRESHOLD <- 5   # minimum difference of interest, in µmol mol-1
+
+# Title built from the actual estimates rather than hardcoded, so it never asserts
+# a "null result" (or any other conclusion) that the current data do not support.
+n_excl_zero <- sum(null_result$ci_low > 0 | null_result$ci_high < 0, na.rm = TRUE)
+fig_title <- sprintf(
+  "%d of %d N/P effect estimates on iWUE exclude zero (95%% CI)",
+  n_excl_zero, nrow(null_result))
+
+fig_null <- ggplot(null_result, aes(x = estimate, y = species,
+                             colour = term, shape = term)) +
+  annotate("rect", xmin = -THRESHOLD, xmax = THRESHOLD, ymin = -Inf, ymax = Inf,
+           fill = "grey86", alpha = 0.5) +
+  geom_vline(xintercept = 0, colour = "black", linewidth = 0.5) +
+  geom_errorbarh(aes(xmin = ci_low, xmax = ci_high),
+                 height = 0.16, position = position_dodge(width = 0.5),
+                 linewidth = 0.6) +
+  geom_point(size = 2.6, position = position_dodge(width = 0.5)) +
+  scale_colour_manual(values = c("N addition" = C_N, "P addition" = C_P)) +
+  scale_shape_manual(values = c(16, 15)) +
+  labs(x = "Change in iWUE relative to control (µmol mol-1, ± 95% CI)",
+       y = NULL, colour = NULL, shape = NULL,
+       title = fig_title,
+       caption = paste0("Grey band: region of practical equivalence (± ", THRESHOLD, " µmol mol-1). ",
+                         "Review the wording above against Table 1 before using it in the manuscript.")) +
+  theme_bw(base_size = 10) +
+  theme(axis.text.y = element_text(face = "italic"),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "bottom",
+        plot.title = element_text(size = 10))
+
+ggsave("fig_iWUE_null_EN.png", fig_null, width = 7.5, height = 4.6, dpi = 300)
+fig_null
+```
+
+## 5.4 Coefficients by variable group
+
+```{r plot-coefs-function}
+# One reusable "coefficient plot" for a whole variable group: rows = variables,
+# columns = species (facet_grid(variable ~ species)), points = the N/P/N×P
+# estimates with their 95% CI. scales = "free_y" lets each ROW have its own
+# y-axis range, since e.g. iWUE and d13C cellulose live on completely
+# different numeric scales and shouldn't share one axis.
+plot_coefs_grid <- function(coefs, variables, title = "", ratio = 1) {
+  d <- coefs %>%
+    dplyr::filter(variable %in% variables) %>%
+    dplyr::mutate(
+      variable = factor(variable, levels = variables),
+      species  = factor(species, levels = names(species_list)),
+      term     = factor(gsub(":", "×", term), levels = c("N", "P", "N×P"))
+    )
+  ggplot(d, aes(x = term, y = estimate, colour = term)) +
+    geom_hline(yintercept = 0, linetype = "dashed", colour = "grey62") +
+    geom_linerange(aes(ymin = ci_low, ymax = ci_high), linewidth = 0.6) +
+    geom_point(size = 2.2) +
+    geom_text(aes(label = sig, y = ci_high), vjust = -0.4, size = 3.2,
+              fontface = "bold", colour = "black") +
+    scale_colour_manual(values = c("N" = C_N, "P" = C_P, "N×P" = C_NP)) +
+    facet_grid(variable ~ species, scales = "free_y", switch = "y") +
+    labs(title = title, x = NULL, y = "Estimate (± 95% CI)",
+         caption = "N blue · P red · N×P grey. † p<0.1, * p<0.05, ** p<0.01, *** p<0.001") +
+    expand_limits(y = 0) +
+    theme_bw(base_size = 9) +
+    theme(aspect.ratio = ratio,
+          legend.position = "none",
+          strip.text.y.left = element_text(angle = 0, size = 8),
+          strip.text.x = element_text(face = "italic", size = 8),
+          strip.placement = "outside",
+          panel.grid.minor = element_blank())
+}
+```
+
+```{r coef-plots, fig.width=12, fig.height=13}
+nutrients_plot_vars <- names(vars_nutrients)[
+  vars_nutrients %in% c("logNmass", "N_area", "logPmass", "P_area", "N:P", "C:N")
+]
+
+g_physio <- plot_coefs_grid(res_physio$coefficients, names(vars_physio), "Physiological variables")
+g_morpho <- plot_coefs_grid(res_morpho$coefficients, names(vars_morpho), "Morphological variables")
+g_nutrients <- plot_coefs_grid(res_nutrients$coefficients, nutrients_plot_vars, "Leaf nutrients")
+
+# height scales with the number of rows in the facet grid (one row per physiological
+# variable): 2 variables now (iWUE + d13C cellulose) instead of 1, so this is taller
+# than before.
+ggsave("coef_physiological_Bernacchi_EN.png", g_physio,    width = 12, height = 9,  dpi = 300)
+ggsave("coef_morphological_Bernacchi_EN.png", g_morpho,    width = 12, height = 11, dpi = 300)
+ggsave("coef_nutrients_Bernacchi_EN.png",     g_nutrients, width = 12, height = 13, dpi = 300)
+
+g_physio
+```
+
+# 6. Additional tests: iWUE vs. N_area
+
+```{r tests-Narea}
+tests_Narea <- purrr::map_dfr(names(species_data), function(sp) {
+  d <- species_data[[sp]]
+  m <- suppressWarnings(lmer(
+    `iWUE_Bernacchi (μmol/mol)` ~ N_area + N * P + (1 | Block),
+    data = d, control = lmerControl(check.conv.singular = "ignore")))
+  broom.mixed::tidy(m, effects = "fixed") %>%
+    dplyr::filter(term == "N_area") %>%
+    dplyr::transmute(species = sp, estimate = estimate, se = std.error, p = p.value)
+})
+kbl(tests_Narea, digits = 4,
+    caption = "Effect of area-based N on iWUE (controlling for treatment)") %>%
+  kable_styling(font_size = 9)
+```
+
+# 7. Results tables (Word document)
+
+Exports the significant-effects tables (p < 0.05) and the model-selection summary to a
+single Word document, in English, structured as one main table (iWUE) and two
+supplementary tables (morphological traits, nutrient traits) — mirroring how these
+results should be split between the main text and the supplementary material.
+
+```{r word-tables}
+fmt_coef_table <- function(df) {
+  df %>%
+    dplyr::filter(p < 0.05) %>%
+    dplyr::mutate(
+      Estimate  = sprintf("%.2f (SE = %.2f)", estimate, se),
+      `95% CI`  = sprintf("[%.2f, %.2f]", ci_low, ci_high),
+      p         = ifelse(p < 0.001, "<0.001", sprintf("%.3f", p))
+    ) %>%
+    dplyr::select(Species = species, Variable = variable, Model = model,
+                  Term = term, Estimate, `95% CI`, p, Sig = sig, n)
+}
+
+add_word_table <- function(doc, title, df) {
+  doc <- officer::body_add_par(doc, title, style = "heading 2")
+  ft  <- flextable::flextable(df)
+  ft  <- flextable::autofit(ft)
+  ft  <- flextable::theme_booktabs(ft)
+  flextable::body_add_flextable(doc, ft)
+}
+
+word_doc <- officer::read_docx()
+word_doc <- officer::body_add_par(
+  word_doc, "Results tables — Bernacchi dataset (N x P fertilization, NUMEX)",
+  style = "heading 1")
+
+word_doc <- add_word_table(
+  word_doc, "Table 1. Significant effects — physiological variables (iWUE Bernacchi, d13C cellulose) — main result",
+  fmt_coef_table(res_physio$coefficients))
+
+word_doc <- add_word_table(
+  word_doc, "Table S1. Significant effects — morphological traits",
+  fmt_coef_table(res_morpho$coefficients))
+
+word_doc <- add_word_table(
+  word_doc, "Table S2. Significant effects — nutrient traits",
+  fmt_coef_table(res_nutrients$coefficients))
+
+word_doc <- add_word_table(
+  word_doc, "Table S3. Model selection (N+P vs N*P, likelihood-ratio test)",
+  bind_rows(res_physio$selection, res_morpho$selection, res_nutrients$selection))
+
+print(word_doc, target = "results_tables_Bernacchi_EN.docx")
+message("Saved: results_tables_Bernacchi_EN.docx")
+```
+
+# 8. Session info
+
+```{r session}
+sessionInfo()
+```
