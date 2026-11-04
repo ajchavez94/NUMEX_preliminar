@@ -171,8 +171,8 @@ vars_nutrients <- c(
 changing the scheme here propagates through the whole document.
 
 ```{r palette}
-C_N  <- "#2c6fbb"   # blue
-C_P  <- "#c0392b"   # red
+C_P  <- "#2c6fbb"   # blue
+C_N  <- "#c0392b"   # red
 C_NP <- "#7f7f7f"   # grey
 C_C  <- "#ffffff"   # control, white fill
 

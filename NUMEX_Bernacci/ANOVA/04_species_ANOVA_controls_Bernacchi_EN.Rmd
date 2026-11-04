@@ -83,10 +83,14 @@ SOLO_CONTROLES <- TRUE
 
 ALFA <- 0.05   # umbral para las letras de Tukey
 
-# Rampa secuencial para la elevación: un solo tono, de claro a oscuro.
-# Es lo correcto para una variable ordenada (1000 < 2000 < 3000 m); una paleta
-# de colores distintos sugeriría categorías sin orden.
-col_elev <- c("1000" = "#c7e9c0", "2000" = "#74c476", "3000" = "#238b45")
+# Paleta de elevación acordada (la misma de las demás figuras): rampa secuencial
+# amarillo pálido → verde medio, de claro a oscuro. Es lo correcto para una
+# variable ordenada (1000 < 2000 < 3000 m).
+COLORES_ELEV <- c("1000 m" = "#FFF2A8",   # amarillo pálido (el más claro)
+                  "2000 m" = "#C7E6A3",   # verde claro (intermedio)
+                  "3000 m" = "#7FBF7B")   # verde medio (el más oscuro)
+ALFA_SOMBRA <- 1   # cajas opacas: el tono ya es suave
+ALFA_FONDO  <- 1   # (no se usa en este cuaderno; se mantiene igual que en las demás figuras)
 ```
 
 # 2. Datos
@@ -145,7 +149,9 @@ d <- data %>%
   mutate(
     Species   = factor(names(species_list)[match(species_label, unlist(species_list))],
                        levels = names(species_list)),
-    Elevation = factor(elevacion[as.character(Species)], levels = c(1000, 2000, 3000))
+    # Niveles "1000 m", "2000 m", "3000 m": deben coincidir con los nombres de COLORES_ELEV
+    Elevation = factor(paste(elevacion[as.character(Species)], "m"),
+                       levels = names(COLORES_ELEV))
   )
 
 if (SOLO_CONTROLES) d <- filter(d, Sub == "C")
@@ -159,12 +165,12 @@ table(Species = d$Species, Elevation = d$Elevation)
 # Estas etiquetas son las MISMAS que en 03_emmeans_figure_Bernacchi_EN.Rmd.
 
 vars_main <- c(
-  "iWUE, Bernacchi (µmol mol-1)"        = COL_iWUE,
+  "iWUE (µmol mol-1)"        = COL_iWUE,
   "d13C cellulose (per mil vs V-PDB)"   = COL_d13C,
-  "N content, mass-based (mg g-1 DM)"   = "LNC",
-  "N content, area-based (g m-2)"       = "N_area",
-  "P content, mass-based (mg g-1 DM)"   = "LPC",
-  "P content, area-based (g m-2)"       = "P_area",
+  "LNC (mg g-1 DM)"   = "LNC",
+  "Narea (g m-2)"       = "N_area",
+  "LPC (mg g-1 DM)"   = "LPC",
+  "Parea (g m-2)"       = "P_area",
   "Leaf N:P ratio (mass-based)"         = "N:P"
 )
 
@@ -243,12 +249,12 @@ make_panel <- function(res, etiqueta, eje_x = TRUE) {
 
   p <- ggplot(dd, aes(x = Species, y = valor)) +
     geom_boxplot(aes(fill = Elevation), outlier.shape = NA,
-                 linewidth = 0.35, colour = "grey25", alpha = 0.85) +
+                 linewidth = 0.35, colour = "grey25", alpha = ALFA_SOMBRA) +
     geom_jitter(width = 0.14, height = 0, size = 1.1, alpha = 0.45,
                 colour = "grey20") +
     geom_text(data = cld, aes(x = Species, y = y + 0.045 * diff(rng), label = letra),
               size = 3, fontface = "bold", vjust = 0, colour = "grey15") +
-    scale_fill_manual(values = col_elev, name = "Elevation (m)") +
+    scale_fill_manual(values = COLORES_ELEV, name = "Elevation", drop = FALSE) +
     coord_cartesian(ylim = c(rng[1] - 0.05 * diff(rng), rng[2] + aire)) +
     labs(x = NULL, y = etiqueta) +
     theme_bw(base_size = 9) +
