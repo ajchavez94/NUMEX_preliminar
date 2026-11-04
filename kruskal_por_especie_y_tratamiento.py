@@ -21,13 +21,20 @@ def kruskal_por_especie_y_tratamiento(df, variable):
     from scipy.stats import f_oneway
 
     resultados = []
+    #df = df[~((df["iWUE (μmol/mol)"] >= 75) & (df["genus"] == "Hedyosmum"))] borrar valores sospechosos
 
     for especie in df['name'].unique():
         sub_df = df[df['name'] == especie] #filtra por especie
+        print(f"\nProcesando Especie: {especie}")
+        print(f"\nTotal muestras: {len(sub_df)}")
         # Crear lista de valores por tratamiento (ignorando NaNs)
         grupos = [sub_df[sub_df['Sub'] == tr][variable].dropna() #luego selecciona el tratamiento y forma grupos
-                  for tr in sub_df['Sub'].unique()]         
+                  for tr in sub_df['Sub'].unique()]
+        tratamientos = sub_df["Sub"].unique()
         print("Comparacion entre tratamientos")
+
+        for tr, g in zip(tratamientos, grupos):
+         print(f"{tr}: n = {len(g)}")
         print(variable)
         # Solo si hay al menos dos tratamientos con datos
         if sum([len(g) > 0 for g in grupos]) >= 2:
@@ -35,18 +42,18 @@ def kruskal_por_especie_y_tratamiento(df, variable):
             print(f"\nTEST KRUSKALL")
             df_libertad = len(grupos) - 1
 
-            print(f"\nEspecie: {especie}")
+            #print(f"\nEspecie: {especie}")
             print(f"H = {h_stat:.3f}, p = {p_val:.4f}, df = {df_libertad}")
 
             resultados.append({
-                "especie": especie,
+                #"especie": especie,
                 "H": h_stat,
                 "p": p_val,
                 "df": df_libertad
             })
 
             print(f"\nTEST ANOVA DE UNA VIA")
-            print(f"\nEspecie: {especie}")
+            #print(f"\nEspecie: {especie}")
 
             f_statistic, p_value = f_oneway(*grupos)
 

@@ -1,0 +1,251 @@
+---
+title: "Elevation models"
+author: "Andrea"
+date: "12/12/2025"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set
+
+```
+
+```{r libraries}
+
+
+library(tidyverse)
+library(glmmTMB)
+library(DHARMa)
+library(ggplot2)
+library(scico)
+library(lmerTest)
+library(lme4)
+library(tables)
+library(dplyr)
+library(flextable)
+library(readxl)
+library(modelsummary)
+library(knitr)
+
+```
+
+## Elevation analysis
+This analysis have been performed making groups each elevation level and see the trends. 
+
+```{r}
+
+getwd()
+data_for_R <- read_excel('data_for_R.xlsx')
+data_1 = data_for_R
+
+
+data <- data_1 %>%
+  dplyr::select(
+        `name`,
+        `genus`,
+        `Sub`,
+        `N`,
+        `P`,
+        `Bloque`,
+        `elevation_m`,
+         `Site`,
+    `iWUE (μmol/mol)`,
+    `δ18O in ‰ vs DeltaSMOW`,
+    `Specific leaf area (cm²/g)`,
+    `δ13C (‰ v.s.V-PDB)`,
+    Narea
+
+  ) 
+
+ggplot(data, aes(x = `δ18O in ‰ vs DeltaSMOW`, 
+                 y = `δ13C (‰ v.s.V-PDB)`,colour = name)) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~ elevation_m, ncol = 3) +
+  theme_bw() +
+  labs(
+    x = expression(delta^{18}*O),
+    y = expression(delta^{13}*C),
+    title = "Relationship between δ13C and δ18O per species"
+  )
+
+```
+
+
+```{r Elevation Analysis}
+# Then here we split the data per elevation group and apply models to see the differences between species and treatments.
+# Same analysis with each response variable.
+
+datos_3000 <- data %>%
+filter(data$Site == "CaNu")
+
+modelCaNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ Narea*Sub*name  + (1 |Bloque), data = datos_3000)
+modelCaNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ Narea*Sub*name + (1 |Bloque), data = datos_3000)
+
+#modelCaNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+#modelCaNu_CN <- lmer(`C:N` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+
+
+datos_1000 <- data %>%
+filter(data$Site == "BoN")
+
+
+modelBoNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ Narea*Sub*name + (1 |Bloque), data = datos_1000)
+modelBoNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ Narea*Sub*name + (1 |Bloque), data = datos_1000)
+#modelBoNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+#modelBoNu_CN <- lmer(`C:N` ~ N*P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+
+
+datos_2000 <- data %>%
+filter(data$Site == "SFNu")
+
+modelSF_iWUE <- lmer(`iWUE (μmol/mol)` ~ Narea*Sub*name+ (1 |Bloque), data = datos_2000)
+modelSF_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ Narea*Sub*name + (1 |Bloque), data = datos_2000)
+#modelSF_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
+#modelSF_CN <- lmer(`C:N` ~ N*P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
+
+
+### Results For BoNu for iWUE, there is a marginal effect of N and N:P but not significant. SF no effect.CaNu no effect.
+
+
+```
+
+```{r}
+
+models  <- list(
+  "3000 m - iWUE (μmol/mol)" = modelCaNu_iWUE,
+  #"3000 m - O18"  = modelCaNu_18O,
+  #"3000 m - N15"  = modelCaNu_15N,
+  #"3000 m - CN"   = modelCaNu_CN,
+
+  "2000 m iWUE" = modelSF_iWUE,
+  #"2000 m O18"  = modelSF_18O,
+  #"2000 m N15"  = modelBoNu_15N,
+  #"2000 m CN"   = modelSF_CN,
+
+  "1000 m iWUE" = modelBoNu_iWUE
+  #"1000 m O18"  = modelBoNu_18O)
+  #"1000 m N15"  = modelBoNu_15N,
+  #"1000 m CN"   = modelBoNu_CN)
+)
+
+ 
+# exportar tabla
+tab <- modelsummary(
+  models,
+  output = "data.frame",
+  stars = TRUE,
+  gof_map = c("nobs", "r.squared", "aic")
+)
+
+# transponer
+
+# fijar nombres de columna usando la primera fila
+#colnames(tab_t) <- tab_t[1, ]
+#tab_t <- tab_t[-1, ]  # quitar fila original de nombres
+
+# mostrar tabla
+kable(tab)
+```
+
+
+### Results For BoNu for iWUE, there is a marginal effect of N and N:P but not significant. SF no effect.CaNu no effect.
+### HELP: iWUE, 18o Here for SF and BoNu no problems but the CaNu has problems.
+```{r sin interaccion}
+# Then here we split the data per elevation group and apply models to see the differences between species and treatments.
+# Same analysis with each response variable.
+
+datos_3000 <- data %>%
+filter(data$Site == "CaNu")
+
+
+modelCaNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+modelCaNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+modelCaNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P + (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+modelCaNu_CN <- lmer(`C:N` ~ N+P+ (1 |name) + (1 |Bloque/Plot), data = datos_3000)
+
+
+datos_1000 <- data %>%
+filter(data$Site == "BoN")
+
+
+ 
+modelBoNu_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P+(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+modelBoNu_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+modelBoNu_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P +(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+modelBoNu_CN <- lmer(`C:N` ~ N+P+(1 |name) + (1 |Bloque/Plot), data = datos_1000)
+
+
+datos_2000 <- data %>%
+filter(data$Site == "SFNu")
+
+
+modelSF_iWUE <- lmer(`iWUE (μmol/mol)` ~ N+P + (1 |name) + (1 |Bloque/Plot), data = datos_2000)
+modelSF_18O <- lmer(`δ18O in ‰ vs DeltaSMOW` ~ N+P + (1 |name) + (1 |Plot), data = datos_2000)
+modelSF_15N <- lmer(`δ15N (‰ v.s.AIR)` ~ N+P + (1 |name) + (1 |Plot), data = datos_2000)
+modelSF_CN <- lmer(`C:N` ~ N+P + (1 |name) + (1 |Plot), data = datos_2000)
+
+
+### Results For BoNu for iWUE, there is a marginal effect of N and N:P but not significant. SF no effect.CaNu no effect.
+
+
+```
+
+
+```{r diagnostiscs common }
+
+plot_diagnostics <- function(model, model_name) {
+  
+  res <- residuals(model)#residual
+  fit <- fitted(model) #model
+  
+  par(mfrow = c(1, 2)) #graph
+  
+  # Residuals vs Fitted
+  plot(fit, res,
+       xlab = "Fitted values",
+       ylab = "Residuals",
+       main = paste(model_name, "\nResiduals vs Fitted"))
+  abline(h = 0, col = "red", lty = 2)
+  
+  # QQ plot
+  qqnorm(res, main = paste(model_name, "\nNormal Q-Q"))
+  qqline(res, col = "red", lty = 2)
+  
+  par(mfrow = c(1, 1))
+}
+
+#apply the plot_diagnostics_to_all
+pdf("model_diagnostics_elevatiom.pdf", width = 10, height = 5)
+
+for (nm in names(models)) {
+  plot_diagnostics(models[[nm]], nm)
+}
+
+dev.off()
+
+```
+
+
+```{r DHARMA diagnostics}
+# Run and plot
+for (nm in names(models)) {
+  cat("\n", nm, "\n")
+  res <- simulateResiduals(models[[nm]], n = 1000)
+  plot(res, main = nm)
+}
+
+testUniformity(res)
+testDispersion(res)
+testOutliers(res)
+
+pdf("DHARMa_diagnostics_elevation.pdf", width = 9, height = 7)
+
+for (nm in names(models)) {
+  res <- simulateResiduals(models[[nm]], n = 1000)
+  plot(res, main = nm)
+}
+
+dev.off()
+
+```
+
