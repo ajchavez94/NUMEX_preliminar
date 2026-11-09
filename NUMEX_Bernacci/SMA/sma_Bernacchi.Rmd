@@ -68,7 +68,7 @@ COLORES_TRAT <- c("C" = "white", "P" = "#2c6fbb", "N" = "#c0392b", "N+P" = "#7f7
 COLORES_ELEV <- c("1000" = "#FFD43B",   # amarillo
                   "2000" = "#9BD18B",   # verde claro
                   "3000" = "#1B5E20")   # verde oscuro
-ALFA_FONDO   <- 0.20   # transparencia del sombreado (0 = invisible, 1 = opaco)
+ALFA_FONDO   <- 0.25   # transparencia del sombreado (0 = invisible, 1 = opaco)
 
 # Escalas de los paneles dentro de cada fila:
 #   "free_y" = eje X COMÚN a las 6 especies (se comparan entre elevaciones), Y libre

@@ -108,18 +108,26 @@ table(data$species_label, data$Sub)
 ```
 
 ```{r species}
-species_list <- list(
-  "P. torta"        = "Pouteria torta",
-  "C. racemosa"     = "Clarisia racemosa",
-  "A. lojaensis"    = "Alchornea lojaensis",
-  "Myrcia sp. nov." = "Myrcia sp nov",
-  "H. purpurascens" = "Hedyosmum purpurascens",
-  "W. loxensis"     = "Weinmannia loxensis"
-)
+# Species names shown in figures and tables:
+#   "name_1" = genus + epithet initial  (Clarisia r.)
+#   "name_2" = genus initial + epithet  (C. racemosa)
+NOMBRES <- "name_1"
 
-elevation <- c("P. torta" = 1000, "C. racemosa" = 1000,
-               "A. lojaensis" = 2000, "Myrcia sp. nov." = 2000,
-               "H. purpurascens" = 3000, "W. loxensis" = 3000)
+# One table, in panel order (1000 -> 3000 m). nombre_datos = as in species_label.
+especies <- data.frame(
+  nombre_datos = c("Pouteria torta", "Clarisia racemosa", "Alchornea lojaensis",
+                   "Myrcia sp nov", "Hedyosmum purpurascens", "Weinmannia loxensis"),
+  name_1       = c("Pouteria t.", "Clarisia r.", "Alchornea l.",
+                   "Myrcia sp. nov.", "Hedyosmum p.", "Weinmannia l."),
+  name_2       = c("P. torta", "C. racemosa", "A. lojaensis",
+                   "Myrcia sp. nov.", "H. purpurascens", "W. loxensis"),
+  elevacion    = c(1000, 1000, 2000, 2000, 3000, 3000),
+  stringsAsFactors = FALSE
+)
+if (!NOMBRES %in% c("name_1", "name_2")) stop("NOMBRES must be 'name_1' or 'name_2'")
+
+species_list <- setNames(as.list(especies$nombre_datos), especies[[NOMBRES]])
+elevation    <- setNames(especies$elevacion, especies[[NOMBRES]])
 
 species_data <- lapply(species_list, function(sp) dplyr::filter(data, species_label == sp))
 sapply(species_data, nrow)
@@ -202,9 +210,15 @@ sub_colors  <- c("C" = C_C, "N" = C_N, "P" = C_P, "N+P" = C_NP)
 raw_colors  <- c("C" = "#9a9a9a", "N" = C_N, "P" = C_P, "N+P" = "#6f6f6f")
 term_colors <- c("N" = C_N, "P" = C_P, "N:P" = C_NP, "N×P" = C_NP)
 
+# Marginal significance (0.05 <= p < 0.10): a small point instead of the dagger.
+# Written as a Unicode code so it does not break when the Rmd is opened on Windows.
+#   "•" = •  (medium point, used)
+#   "·" = ·  (smaller point, if the one above looks too big)
+MARCA_MARGINAL <- "•"
+
 sig_stars <- function(p) {
   dplyr::case_when(is.na(p) ~ "", p < 0.001 ~ "***", p < 0.01 ~ "**",
-                   p < 0.05 ~ "*", p < 0.10 ~ "†", TRUE ~ "")
+                   p < 0.05 ~ "*", p < 0.10 ~ MARCA_MARGINAL, TRUE ~ "")
 }
 ```
 
@@ -663,7 +677,8 @@ fig_hybrid <- wrap_plots(plots, ncol = 6, nrow = length(vars_main)) +
     subtitle = paste(
       "Large points: marginal mean of the selected model (± 95% CI).",
       "Pale points: individual trees. Dashed line: control.\n",
-      "Asterisks: contrast vs. control († p<0.1, * p<0.05, ** p<0.01, *** p<0.001).",
+      paste0("Asterisks: contrast vs. control (", MARCA_MARGINAL,
+             " p<0.1, * p<0.05, ** p<0.01, *** p<0.001)."),
       "N red - P blue - N+P grey."),
     theme = theme(plot.title = element_text(size = FONT_PT + 1, hjust = 0.5),
                   plot.subtitle = element_text(size = FONT_PT - 1, hjust = 0.5, colour = "grey30"))
@@ -798,7 +813,8 @@ plot_coefs_grid <- function(coefs, variables, title = "", ratio = 1,
   }
 
   cap <- paste0(
-    "N red · P blue · N×P grey. Estimate ± 95% CI. † p<0.1, * p<0.05, ** p<0.01, *** p<0.001",
+    "N red · P blue · N×P grey. Estimate ± 95% CI. ", MARCA_MARGINAL,
+    " p<0.1, * p<0.05, ** p<0.01, *** p<0.001",
     if (show_values) ". Numbers: coefficient estimate" else "",
     if (show_r2) ". R²m: marginal R² of the selected model (variance explained by N and P)" else "")
 

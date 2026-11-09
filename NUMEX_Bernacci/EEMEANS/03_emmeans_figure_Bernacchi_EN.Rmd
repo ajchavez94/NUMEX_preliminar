@@ -133,6 +133,11 @@ ARCHIVOS <- c(
 # suplementario de la sección 7).
 MODO_MANUSCRITO <- "none"
 
+# Nombres de especie en todas las figuras y CSV:
+#   "name_1" = género + inicial del epíteto  (Clarisia r.)
+#   "name_2" = inicial del género + epíteto  (C. racemosa)
+NOMBRES <- "name_2"
+
 # Umbral de tamaño de celda por debajo del cual se marca la n en rojo
 N_MINIMO <- 3
 
@@ -149,6 +154,9 @@ emm_options(lmer.df = "satterthwaite")
 # 2. Datos
 
 ```{r datos}
+ARCHIVO <- "data_for_R_Bernacchi.xlsx"
+HOJA    <- "data"
+
 data <- read_excel(ARCHIVO, sheet = "data")
 
 data <- data %>%
@@ -183,15 +191,26 @@ table(N = data$N, P = data$P)
 ```
 
 ```{r especies}
-# Nombre corto (el que sale en la figura) = nombre tal cual está en species_label
-species_list <- list(
-  "P. torta"        = "Pouteria torta",
-  "C. racemosa"     = "Clarisia racemosa",
-  "A. lojaensis"    = "Alchornea lojaensis",
-  "Myrcia sp. nov." = "Myrcia sp nov",
-  "H. purpurascens" = "Hedyosmum purpurascens",
-  "W. loxensis"     = "Weinmannia loxensis"
+# Tabla de especies, en el orden de los paneles (1000 → 3000 m).
+#   nombre_datos = tal cual está en species_label
+#   name_1 / name_2 = las dos opciones de nombre para las figuras (ver NOMBRES)
+especies <- data.frame(
+  nombre_datos = c("Pouteria torta", "Clarisia racemosa", "Alchornea lojaensis",
+                   "Myrcia sp nov", "Hedyosmum purpurascens", "Weinmannia loxensis"),
+  name_1       = c("Pouteria t.", "Clarisia r.", "Alchornea l.",
+                   "Myrcia sp. nov.", "Hedyosmum p.", "Weinmannia l."),
+  name_2       = c("P. torta", "C. racemosa", "A. lojaensis",
+                   "Myrcia sp. nov.", "H. purpurascens", "W. loxensis"),
+  elevacion    = c("1000 m", "1000 m", "2000 m", "2000 m", "3000 m", "3000 m"),
+  stringsAsFactors = FALSE
 )
+if (!NOMBRES %in% c("name_1", "name_2")) stop("NOMBRES debe ser 'name_1' o 'name_2'")
+
+# Nombre en la figura = nombre tal cual está en species_label
+species_list <- setNames(as.list(especies$nombre_datos), especies[[NOMBRES]])
+
+# Elevación de cada especie, con el mismo nombre que sale en la figura
+ELEVACION <- setNames(especies$elevacion, especies[[NOMBRES]])
 
 species_data <- lapply(species_list, function(sp) filter(data, species_label == sp))
 stopifnot(all(sapply(species_data, nrow) > 0))   # aborta si algún nombre no cuadra
@@ -229,9 +248,15 @@ dot_trt  <- c("C" = "#9a9a9a", "N" = C_N, "P" = C_P, "N+P" = "#6f6f6f")
 
 NIVELES <- c("C", "N", "P", "N+P")   # orden de los tratamientos en el eje X
 
+# Símbolo de significancia marginal (0.05 ≤ p < 0.10): un punto pequeño.
+# Se escribe con su código Unicode para que no se estropee al abrir el Rmd en Windows.
+#   "•" = •  (punto mediano, el que se usa)
+#   "·" = ·  (punto más pequeño, por si el anterior se ve grande)
+MARCA_MARGINAL <- "•"
+
 estrellas <- function(p) {
   case_when(is.na(p) ~ "", p < 0.001 ~ "***", p < 0.01 ~ "**",
-            p < 0.05 ~ "*", p < 0.10 ~ "†", TRUE ~ "")
+            p < 0.05 ~ "*", p < 0.10 ~ MARCA_MARGINAL, TRUE ~ "")
 }
 
 # Devuelve, para un modo dado, QUÉ asterisco se dibuja y DE QUÉ COLOR.
@@ -660,7 +685,7 @@ construir_figura <- function(modo, etiquetas = names(vars_fig)) {
       subtitle = paste0(
         "Large points: marginal mean of the selected model (± 95% CI). ",
         "Pale points: individual trees. Dashed line: control mean.\n",
-        linea_sig, " († p<0.1, * p<0.05, ** p<0.01, *** p<0.001)\n",
+        linea_sig, " (", MARCA_MARGINAL, " p<0.1, * p<0.05, ** p<0.01, *** p<0.001)\n",
         "Red n = cells with fewer than ", N_MINIMO, " trees. ",
         "N×P = the selected model retained the interaction. ",
         "N blue · P red · N+P grey."),
@@ -776,14 +801,12 @@ cambio_pct %>%
 COLUMNAS_LOG <- c("logNmass", "logPmass", "logNP")
 
 # Título de cada panel (izquierda → derecha), según el nombre de la columna
-TITULOS <- c(logNmass = "Leaf N (mass-based)",
-             logPmass = "Leaf P (mass-based)",
+TITULOS <- c(logNmass = "Leaf LCN (mass-based)",
+             logPmass = "Leaf LCP (mass-based)",
              logNP    = "Leaf N:P ratio")
 
-# Elevación de cada especie (para el sombreado)
-ELEVACION <- c("P. torta" = "1000 m", "C. racemosa" = "1000 m",
-               "A. lojaensis" = "2000 m", "Myrcia sp. nov." = "2000 m",
-               "H. purpurascens" = "3000 m", "W. loxensis" = "3000 m")
+# Elevación de cada especie (para el sombreado): se define en el chunk `especies`,
+# así sigue el nombre elegido en NOMBRES
 
 COLORES_ELEV <- c("1000 m" = "#FFD43B",   # amarillo
                   "2000 m" = "#9BD18B",   # verde claro

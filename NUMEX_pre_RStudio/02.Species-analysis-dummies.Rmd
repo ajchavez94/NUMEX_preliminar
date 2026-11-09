@@ -46,7 +46,7 @@ data= data_for_R
 ```{r transformando columnas}
 
 ### nutrientes para ver cual funciona mejor.
-data$logNmass <- log(data$LNC) #
+data$logNmass <- log(data$LNC) #en base e no dice 10
 data$logCmass <- log(data$LCC) #
 data$logPmass <- log(data$LPC) #
 
